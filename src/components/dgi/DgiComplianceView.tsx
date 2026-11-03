@@ -25,6 +25,7 @@ import {
   FileSpreadsheet,
 } from 'lucide-react';
 import { QRCodeSVG } from 'qrcode.react';
+import { DgiBordereauFiscalModal } from './DgiBordereauFiscalModal';
 
 export const DgiComplianceView: React.FC = () => {
   const { sales, expenses, settings, updateSettings, metrics, setActivePrintSale } = useApp();
@@ -53,7 +54,8 @@ export const DgiComplianceView: React.FC = () => {
 
   // Verifier search query
   const [verifySearchQuery, setVerifySearchQuery] = useState('');
-  const [selectedMonth, setSelectedMonth] = useState('2026-02');
+  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().slice(0, 7));
+  const [isBordereauModalOpen, setIsBordereauModalOpen] = useState(false);
 
   const validSales = sales.filter((s) => s.type === 'INVOICE' || s.type === 'RECEIPT');
 
@@ -531,22 +533,28 @@ export const DgiComplianceView: React.FC = () => {
               </div>
 
               <div className="flex items-center gap-2">
-                <select
+                <input
+                  type="month"
                   value={selectedMonth}
                   onChange={(e) => setSelectedMonth(e.target.value)}
-                  className="h-9 bg-neutral-50 border border-neutral-300 rounded-lg px-3 text-xs text-neutral-900 font-semibold focus:outline-none"
-                >
-                  <option value="2026-02">Février 2026</option>
-                  <option value="2026-03">Mars 2026</option>
-                  <option value="2026-01">Janvier 2026</option>
-                </select>
+                  className="h-9 bg-neutral-50 border border-neutral-300 rounded-lg px-3 text-xs text-neutral-900 font-semibold focus:outline-none focus:border-neutral-900"
+                  title="Sélectionner le mois fiscal de déclaration"
+                />
 
                 <button
                   onClick={handleExportDeclarationExcel}
-                  className="h-9 px-3.5 bg-neutral-900 text-white rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5 hover:bg-neutral-800 shadow-2xs shrink-0"
+                  className="h-9 px-3.5 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 border border-neutral-300 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors shadow-2xs shrink-0 cursor-pointer"
                 >
-                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-400" />
-                  <span>Bordereau Excel (.xlsx)</span>
+                  <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Excel (.xlsx)</span>
+                </button>
+
+                <button
+                  onClick={() => setIsBordereauModalOpen(true)}
+                  className="h-9 px-3.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5 shadow-md shadow-emerald-600/20 shrink-0 cursor-pointer transition-all"
+                >
+                  <Printer className="w-3.5 h-3.5" />
+                  <span>Imprimer Bordereau Officiel DGI</span>
                 </button>
               </div>
             </div>
@@ -700,6 +708,13 @@ export const DgiComplianceView: React.FC = () => {
           </div>
         </div>
       )}
+
+      {/* Modal Bordereau Fiscal Officiel DGI */}
+      <DgiBordereauFiscalModal
+        isOpen={isBordereauModalOpen}
+        onClose={() => setIsBordereauModalOpen(false)}
+        selectedMonth={selectedMonth}
+      />
     </div>
   );
 };

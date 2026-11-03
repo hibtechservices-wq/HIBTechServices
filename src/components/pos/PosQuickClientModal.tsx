@@ -32,7 +32,7 @@ export const PosQuickClientModal: React.FC<PosQuickClientModalProps> = ({
       phone: phone.trim() || '+243 00 000 0000',
       nif: nif.trim() || undefined,
       address: address.trim() || undefined,
-      city: 'Kinshasa',
+      city: 'Lubumbashi',
       type: companyName.trim() ? 'COMPANY' : 'INDIVIDUAL',
     });
 
@@ -112,13 +112,13 @@ export const PosQuickClientModal: React.FC<PosQuickClientModalProps> = ({
 
           <div>
             <label className="block font-semibold text-neutral-700 mb-1">
-              Adresse / Commune (Kinshasa)
+              Adresse / Ville
             </label>
             <input
               type="text"
               value={address}
               onChange={(e) => setAddress(e.target.value)}
-              placeholder="Ex: Av. Kasa-Vubu, Gombe"
+              placeholder="Ex: Av. Kasa-Vubu"
               className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-neutral-900 focus:outline-none focus:bg-white focus:border-neutral-900"
             />
           </div>

@@ -2,7 +2,6 @@ import { AppUser, UserRole, UserPermissions } from '../types';
 
 export const defaultPermissionsByRole: Record<UserRole, UserPermissions> = {
   SUPER_ADMIN: {
-    canAccessDashboard: true,
     canAccessPOS: true,
     canCreateInvoices: true,
     canDeleteInvoices: true,
@@ -14,9 +13,10 @@ export const defaultPermissionsByRole: Record<UserRole, UserPermissions> = {
     canManageUsers: true,
     canViewProfitMargins: true,
     canChangeExchangeRate: true,
+    canReprintInvoices: true,
+    canAccessAccounting: true,
   },
   MANAGER: {
-    canAccessDashboard: true,
     canAccessPOS: true,
     canCreateInvoices: true,
     canDeleteInvoices: false,
@@ -28,9 +28,10 @@ export const defaultPermissionsByRole: Record<UserRole, UserPermissions> = {
     canManageUsers: false,
     canViewProfitMargins: true,
     canChangeExchangeRate: true,
+    canReprintInvoices: true,
+    canAccessAccounting: true,
   },
   CASHIER: {
-    canAccessDashboard: false,
     canAccessPOS: true,
     canCreateInvoices: true,
     canDeleteInvoices: false,
@@ -42,9 +43,10 @@ export const defaultPermissionsByRole: Record<UserRole, UserPermissions> = {
     canManageUsers: false,
     canViewProfitMargins: false,
     canChangeExchangeRate: false,
+    canReprintInvoices: false,
+    canAccessAccounting: false,
   },
   ACCOUNTANT: {
-    canAccessDashboard: true,
     canAccessPOS: false,
     canCreateInvoices: true,
     canDeleteInvoices: false,
@@ -56,9 +58,10 @@ export const defaultPermissionsByRole: Record<UserRole, UserPermissions> = {
     canManageUsers: false,
     canViewProfitMargins: true,
     canChangeExchangeRate: false,
+    canReprintInvoices: true,
+    canAccessAccounting: true,
   },
   STOCK_MANAGER: {
-    canAccessDashboard: false,
     canAccessPOS: false,
     canCreateInvoices: false,
     canDeleteInvoices: false,
@@ -70,6 +73,8 @@ export const defaultPermissionsByRole: Record<UserRole, UserPermissions> = {
     canManageUsers: false,
     canViewProfitMargins: false,
     canChangeExchangeRate: false,
+    canReprintInvoices: false,
+    canAccessAccounting: false,
   },
 };
 
@@ -81,6 +86,7 @@ export const initialUsers: AppUser[] = [
     phone: '+243 81 234 5678',
     role: 'SUPER_ADMIN',
     pinCode: '1234',
+    reprintPassword: '1234',
     isActive: true,
     assignedRegister: 'Bureau de Direction (Accès Total)',
     permissions: defaultPermissionsByRole.SUPER_ADMIN,
@@ -94,8 +100,9 @@ export const initialUsers: AppUser[] = [
     phone: '+243 85 999 1122',
     role: 'CASHIER',
     pinCode: '5678',
+    reprintPassword: '5678',
     isActive: true,
-    assignedRegister: 'Caisse 1 - Showroom Gombe',
+    assignedRegister: 'Caisse Principale 1',
     permissions: defaultPermissionsByRole.CASHIER,
     lastLogin: '2026-10-03T08:30:00.000Z',
     createdAt: '2026-01-15T09:00:00.000Z',
@@ -107,6 +114,7 @@ export const initialUsers: AppUser[] = [
     phone: '+243 82 444 9900',
     role: 'ACCOUNTANT',
     pinCode: '9900',
+    reprintPassword: '9900',
     isActive: true,
     assignedRegister: 'Département Comptabilité & Fiscalité DGI',
     permissions: defaultPermissionsByRole.ACCOUNTANT,

@@ -34,7 +34,9 @@ import {
   BarChart2,
   Receipt,
   UserCheck,
+  Trash2,
 } from 'lucide-react';
+import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
 
 interface CashHistoryViewProps {
   onSelectReportSession: (session: CashRegisterSession) => void;
@@ -56,8 +58,11 @@ interface MonthlyStat {
 }
 
 export const CashHistoryView: React.FC<CashHistoryViewProps> = ({ onSelectReportSession }) => {
-  const { cashSessions, settings, currentUser } = useApp();
+  const { cashSessions, settings, currentUser, deleteCashSession } = useApp();
   const rate = settings.exchangeRateUSD_CDF || 2850;
+
+  // Delete modal state
+  const [sessionToDelete, setSessionToDelete] = useState<CashRegisterSession | null>(null);
 
   // Filters state
   const [selectedMonth, setSelectedMonth] = useState<string>('ALL'); // 'ALL' or '2026-10'
@@ -889,15 +894,27 @@ export const CashHistoryView: React.FC<CashHistoryViewProps> = ({ onSelectReport
 
                       {/* Action */}
                       <td className="py-3 px-3 text-center">
-                        <button
-                          type="button"
-                          onClick={() => onSelectReportSession(session)}
-                          className="px-2.5 py-1 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg font-bold text-[11px] font-sans inline-flex items-center gap-1.5 transition-colors shadow-2xs"
-                          title="Consulter le rapport officiel Z de cette session (PDF & impression)"
-                        >
-                          <FileText className="w-3.5 h-3.5 text-amber-400" />
-                          <span>Rapport Z</span>
-                        </button>
+                        <div className="flex items-center justify-center gap-1.5">
+                          <button
+                            type="button"
+                            onClick={() => onSelectReportSession(session)}
+                            className="px-2.5 py-1 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg font-bold text-[11px] font-sans inline-flex items-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
+                            title="Consulter le rapport officiel Z de cette session (PDF & impression)"
+                          >
+                            <FileText className="w-3.5 h-3.5 text-amber-400" />
+                            <span>Rapport Z</span>
+                          </button>
+
+                          <button
+                            type="button"
+                            onClick={() => setSessionToDelete(session)}
+                            className="p-1 text-neutral-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
+                            title={`Supprimer définitivement la session ${session.sessionNumber}`}
+                            aria-label="Supprimer session"
+                          >
+                            <Trash2 className="w-3.5 h-3.5" />
+                          </button>
+                        </div>
                       </td>
                     </tr>
                   );
@@ -907,6 +924,22 @@ export const CashHistoryView: React.FC<CashHistoryViewProps> = ({ onSelectReport
           </div>
         )}
       </div>
+
+      {/* Confirmation Modal for Session Deletion */}
+      <ConfirmDeleteModal
+        isOpen={!!sessionToDelete}
+        title="Supprimer la session de caisse"
+        message={`Êtes-vous sûr de vouloir supprimer définitivement la session de caisse ${sessionToDelete?.sessionNumber} ?`}
+        details={sessionToDelete ? `Session : ${sessionToDelete.sessionNumber} · Caissier : ${sessionToDelete.cashierName} · Date : ${formatDateTime(sessionToDelete.openedAt)}` : undefined}
+        confirmText="Supprimer la session"
+        onConfirm={() => {
+          if (sessionToDelete) {
+            deleteCashSession(sessionToDelete.id);
+            setSessionToDelete(null);
+          }
+        }}
+        onCancel={() => setSessionToDelete(null)}
+      />
     </div>
   );
 };

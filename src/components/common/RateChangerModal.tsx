@@ -31,10 +31,10 @@ export const RateChangerModal: React.FC<RateChangerModalProps> = ({ isOpen, onCl
   return (
     <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
       <div className="bg-white rounded-xl shadow-xl w-full max-w-md border border-neutral-200 overflow-hidden">
-        <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 bg-neutral-50/50">
+        <div className="flex items-center justify-between px-4 sm:px-6 py-3.5 sm:py-4 border-b border-neutral-100 bg-neutral-50/50">
           <div className="flex items-center gap-2">
-            <RefreshCw className="w-5 h-5 text-amber-600" />
-            <h3 className="font-semibold text-neutral-900">Ajuster le Taux du Jour (USD / CDF)</h3>
+            <RefreshCw className="w-5 h-5 text-amber-600 shrink-0" />
+            <h3 className="font-semibold text-sm sm:text-base text-neutral-900">Ajuster le Taux du Jour (USD / CDF)</h3>
           </div>
           <button
             onClick={onClose}
@@ -44,7 +44,7 @@ export const RateChangerModal: React.FC<RateChangerModalProps> = ({ isOpen, onCl
           </button>
         </div>
 
-        <form onSubmit={handleSubmit} className="p-6 space-y-4">
+        <form onSubmit={handleSubmit} className="p-4 sm:p-6 space-y-4">
           <div>
             <p className="text-sm text-neutral-600 mb-3">
               Modifiez le taux de conversion officiel ou du marché local. Toutes vos factures, devis et affichages en Francs Congolais (CDF) seront automatiquement actualisés.

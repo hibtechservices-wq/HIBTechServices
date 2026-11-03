@@ -38,7 +38,7 @@ export const initialEquipments: NetworkEquipment[] = [
     updatedAt: '2024-09-10T14:30:00Z',
   },
 
-  // 2. Starlink Kit - Résidence Gombe
+  // 2. Starlink Kit - Résidence Macampagne
   {
     id: 'eq-starlink-002',
     name: 'Kit Starlink Standard - Résidence DG Macampagne',
@@ -46,7 +46,7 @@ export const initialEquipments: NetworkEquipment[] = [
     clientId: 'cli-003',
     clientName: 'Hôtel Fleuve Congo & Suites',
     siteName: 'Villa Direction Générale - Macampagne',
-    siteAddress: 'Avenue de la Montagne, Ngaliema, Kinshasa, RDC',
+    siteAddress: 'Avenue Kapenda, Lubumbashi, Haut-Katanga, RDC',
     serialNumber: 'KIT-SL-2024-11029-KN',
     macAddress: '70:EE:50:88:BF:02',
     status: 'ACTIVE',
@@ -66,11 +66,11 @@ export const initialEquipments: NetworkEquipment[] = [
       routerModel: 'Routeur Starlink Gen 3 WiFi 6 Tri-Band',
       wifiSsid: 'Starlink_DG_Private',
       wifiPassword: 'FCS#Macampagne2024$',
-      gpsCoordinates: '-4.3317, 15.2658 (Ngaliema)',
+      gpsCoordinates: '-11.6609, 27.4794 (Lubumbashi)',
       obstructionPercentage: 0.2,
       averageLatencyMs: 48,
     },
-    tags: ['Starlink', 'Kinshasa', 'Résidentiel', 'VIP'],
+    tags: ['Starlink', 'Lubumbashi', 'Résidentiel', 'VIP'],
     createdAt: '2024-05-20T08:00:00Z',
     updatedAt: '2024-08-15T11:00:00Z',
   },
@@ -83,7 +83,7 @@ export const initialEquipments: NetworkEquipment[] = [
     clientId: 'cli-003',
     clientName: 'Hôtel Fleuve Congo & Suites',
     siteName: 'Local Serveur & Sécurité (RDC)',
-    siteAddress: 'Boulevard du 30 Juin, Gombe, Kinshasa, RDC',
+    siteAddress: 'Boulevard du 30 Juin, RDC',
     serialNumber: 'DS-7732NXI-I4/16P/S-0928172',
     macAddress: 'C8:02:8D:4A:11:88',
     status: 'ACTIVE',
@@ -110,7 +110,7 @@ export const initialEquipments: NetworkEquipment[] = [
       retentionDays: 45,
       firmwareVersion: 'V4.61.025_231015',
     },
-    tags: ['NVR', 'Hikvision', '32 Canaux', '4K', 'Gombe'],
+    tags: ['NVR', 'Hikvision', '32 Canaux', '4K'],
     createdAt: '2024-01-10T09:00:00Z',
     updatedAt: '2024-09-01T15:00:00Z',
   },
@@ -123,7 +123,7 @@ export const initialEquipments: NetworkEquipment[] = [
     clientId: 'cli-003',
     clientName: 'Hôtel Fleuve Congo & Suites',
     siteName: 'Portail Principal & Allée d’Honneur',
-    siteAddress: 'Boulevard du 30 Juin, Gombe, Kinshasa, RDC',
+    siteAddress: 'Boulevard du 30 Juin, RDC',
     serialNumber: 'DS-2DE4425IW-DE-910283',
     macAddress: 'C8:02:8D:7B:44:01',
     status: 'ACTIVE',
@@ -163,7 +163,7 @@ export const initialEquipments: NetworkEquipment[] = [
     clientId: 'cli-003',
     clientName: 'Hôtel Fleuve Congo & Suites',
     siteName: 'Réception & Comptoir Caisses',
-    siteAddress: 'Boulevard du 30 Juin, Gombe, Kinshasa, RDC',
+    siteAddress: 'Boulevard du 30 Juin, RDC',
     serialNumber: 'DS-2CD2186G2-ISU-109283',
     macAddress: 'C8:02:8D:9C:22:50',
     status: 'ACTIVE',
@@ -211,7 +211,7 @@ export const initialEquipments: NetworkEquipment[] = [
     lastMaintenanceDate: '2024-09-12',
     nextMaintenanceDate: '2025-03-16',
     assignedTechnician: 'Ing. Christian Kabwe',
-    notes: 'Dual WAN avec Failover automatique : WAN1 Starlink Business + WAN2 Fibre Vodacom. Tunnel VPN WireGuard sécurisé vers le siège Kinshasa.',
+    notes: 'Dual WAN avec Failover automatique : WAN1 Starlink Business + WAN2 Fibre Vodacom. Tunnel VPN WireGuard sécurisé vers le siège Lubumbashi.',
     router: {
       brand: 'MikroTik',
       model: 'CCR2004-16G-2S+ (Cloud Core Router 16x GbE, 2x 10G SFP+)',
@@ -226,10 +226,10 @@ export const initialEquipments: NetworkEquipment[] = [
       winboxOrWebPort: 8291,
       sshPort: 2222,
       vpnType: 'WIREGUARD',
-      vpnConfigDetails: 'WireGuard Server Port 51820 / Peer IP 10.200.0.1/24 (Interconnexion Kinshasa-Kolwezi)',
+      vpnConfigDetails: 'WireGuard Server Port 51820 / Peer IP 10.200.0.1/24 (Interconnexion Lubumbashi-Kolwezi)',
       activeVlans: 'VLAN 10 (Management: 192.168.10.0/24), VLAN 20 (CCTV: 192.168.20.0/24), VLAN 30 (Staff WiFi: 192.168.30.0/24), VLAN 40 (Guest: 192.168.40.0/24)',
       backupConfigScript: `# MikroTik RouterOS v7.14.2 Backup
-/interface wireguard add listen-port=51820 name=wg-kinshasa
+/interface wireguard add listen-port=51820 name=wg-lubumbashi
 /ip pool add name=dhcp_pool_staff ranges=192.168.30.10-192.168.30.200
 /ip firewall nat add chain=srcnat out-interface=ether1-starlink action=masquerade
 /ip route add dst-address=0.0.0.0/0 gateway=ether1-starlink distance=1 check-gateway=ping
@@ -240,7 +240,7 @@ export const initialEquipments: NetworkEquipment[] = [
     updatedAt: '2024-09-12T16:00:00Z',
   },
 
-  // 7. Access Point Ubiquiti UniFi U6 Pro - Showroom Gombe
+  // 7. Access Point Ubiquiti UniFi U6 Pro - Showroom Central
   {
     id: 'eq-ap-001',
     name: 'Point d’Accès Wi-Fi 6 Ubiquiti UniFi U6 Pro - Hall Réception',
@@ -248,7 +248,7 @@ export const initialEquipments: NetworkEquipment[] = [
     clientId: 'cli-003',
     clientName: 'Hôtel Fleuve Congo & Suites',
     siteName: 'Grand Hall & Lobby Bar',
-    siteAddress: 'Boulevard du 30 Juin, Gombe, Kinshasa, RDC',
+    siteAddress: 'Boulevard du 30 Juin, RDC',
     serialNumber: 'U6-PRO-US-883921009',
     macAddress: '74:83:C2:55:E1:90',
     status: 'ACTIVE',

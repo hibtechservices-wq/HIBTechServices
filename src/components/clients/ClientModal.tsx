@@ -19,8 +19,8 @@ export const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, clien
   const [whatsapp, setWhatsapp] = useState('+243 ');
   const [email, setEmail] = useState('');
   const [address, setAddress] = useState('');
-  const [city, setCity] = useState('Kinshasa');
-  const [commune, setCommune] = useState('Gombe');
+  const [city, setCity] = useState('');
+  const [commune, setCommune] = useState('');
   const [rccmOrNif, setRccmOrNif] = useState('');
   const [notes, setNotes] = useState('');
 
@@ -33,8 +33,8 @@ export const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, clien
       setWhatsapp(clientToEdit.whatsapp || clientToEdit.phone);
       setEmail(clientToEdit.email || '');
       setAddress(clientToEdit.address || '');
-      setCity(clientToEdit.city || 'Kinshasa');
-      setCommune(clientToEdit.commune || 'Gombe');
+      setCity(clientToEdit.city || '');
+      setCommune(clientToEdit.commune || '');
       setRccmOrNif(clientToEdit.rccmOrNif || '');
       setNotes(clientToEdit.notes || '');
     } else {
@@ -45,8 +45,8 @@ export const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, clien
       setWhatsapp('+243 ');
       setEmail('');
       setAddress('');
-      setCity('Kinshasa');
-      setCommune('Gombe');
+      setCity('Lubumbashi');
+      setCommune('');
       setRccmOrNif('');
       setNotes('');
     }
@@ -112,15 +112,26 @@ export const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, clien
     'Autre Commune',
   ];
 
-  const congoleseCities = [
-    'Kinshasa',
+  const lubumbashiCommunes = [
     'Lubumbashi',
-    'Goma',
+    'Kampemba',
+    'Kamalondo',
+    'Kenya',
+    'Katuba',
+    'Ruashi',
+    'Annexe',
+    'Autre Commune',
+  ];
+
+  const congoleseCities = [
+    'Lubumbashi',
     'Kolwezi',
+    'Likasi',
+    'Goma',
     'Bukavu',
+    'Kinshasa',
     'Matadi',
     'Kisangani',
-    'Likasi',
     'Mbuji-Mayi',
     'Kananga',
     'Boma',
@@ -300,7 +311,19 @@ export const ClientModal: React.FC<ClientModalProps> = ({ isOpen, onClose, clien
               <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
                 Commune / Quartier
               </label>
-              {city === 'Kinshasa' ? (
+              {city === 'Lubumbashi' ? (
+                <select
+                  value={commune}
+                  onChange={(e) => setCommune(e.target.value)}
+                  className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-neutral-900 focus:outline-none focus:bg-white text-xs"
+                >
+                  {lubumbashiCommunes.map((comm) => (
+                    <option key={comm} value={comm}>
+                      {comm}
+                    </option>
+                  ))}
+                </select>
+              ) : city === 'Kinshasa' ? (
                 <select
                   value={commune}
                   onChange={(e) => setCommune(e.target.value)}

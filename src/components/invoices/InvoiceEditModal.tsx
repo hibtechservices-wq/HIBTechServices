@@ -51,6 +51,10 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   // Client change handler
   const handleClientChange = (id: string) => {
     setClientId(id);
+    if (id === 'comptoir') {
+      setClientNif('NON-ASSUJETTI');
+      return;
+    }
     const cl = clients.find((c) => c.id === id);
     if (cl) {
       setClientNif(cl.nif || cl.rccmOrNif || '');
@@ -117,7 +121,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
   };
 
   const handleQtyChange = (index: number, qty: number) => {
-    const validQty = Math.max(1, qty);
+    const validQty = Math.max(0, qty);
     setItems((prev) => {
       const copy = [...prev];
       const it = copy[index];
@@ -182,10 +186,21 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
       return;
     }
 
+    const sanitizedItems = items.map((it) => {
+      const q = it.quantity && it.quantity > 0 ? it.quantity : 1;
+      const sub = q * it.unitPriceUSD;
+      return {
+        ...it,
+        quantity: q,
+        subtotalUSD: sub,
+        taxAmountUSD: it.taxGroup === 'A' ? sub * 0.16 : 0,
+      };
+    });
+
     updateSale(saleToEdit.id, {
       type: docType,
       clientId,
-      items,
+      items: sanitizedItems,
       discountUSD,
       taxPercent,
       amountPaidUSD: docType === 'QUOTE_PROFORMA' ? 0 : amountPaidUSD,
@@ -255,8 +270,8 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                 value={clientId}
                 onChange={(e) => handleClientChange(e.target.value)}
                 className="w-full bg-white border border-neutral-300 rounded-lg px-3 py-2 text-xs font-medium text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
-                required
               >
+                <option value="comptoir">Client Comptoir (Consommateur Final)</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} {c.type === 'COMPANY' ? '(Entreprise)' : '(Particulier)'}
@@ -302,7 +317,7 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                   <tr>
                     <th className="py-2.5 px-3">Article / Prestation</th>
                     <th className="py-2.5 px-3 w-24">Groupe TVA</th>
-                    <th className="py-2.5 px-3 text-center w-20">Qté</th>
+                    <th className="py-2.5 px-2 text-center w-32">Qté</th>
                     <th className="py-2.5 px-3 text-right w-28">Prix Unit. ($)</th>
                     <th className="py-2.5 px-3 text-right w-28">Total HT ($)</th>
                     <th className="py-2.5 px-2 text-center w-10"></th>
@@ -341,14 +356,49 @@ export const InvoiceEditModal: React.FC<InvoiceEditModalProps> = ({
                       </td>
 
                       {/* Qty */}
-                      <td className="py-2 px-3 text-center">
-                        <input
-                          type="number"
-                          min="1"
-                          value={it.quantity}
-                          onChange={(e) => handleQtyChange(idx, parseInt(e.target.value) || 1)}
-                          className="w-16 text-center bg-white border border-neutral-300 rounded-md py-1.5 font-mono-nums font-bold text-neutral-900 focus:outline-none"
-                        />
+                      <td className="py-2 px-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleQtyChange(idx, Math.max(1, (it.quantity || 1) - 1))}
+                            className="w-6 h-6 flex items-center justify-center bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded text-xs transition-colors shrink-0"
+                            title="Diminuer la quantité (-1)"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="any"
+                            value={it.quantity === 0 ? '' : it.quantity}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '') {
+                                handleQtyChange(idx, 0);
+                              } else {
+                                const num = parseFloat(val);
+                                handleQtyChange(idx, isNaN(num) ? 0 : num);
+                              }
+                            }}
+                            onBlur={() => {
+                              if (!it.quantity || it.quantity <= 0) {
+                                handleQtyChange(idx, 1);
+                              }
+                            }}
+                            className="w-14 text-center font-mono-nums font-bold bg-white border border-neutral-300 rounded px-1 py-1 text-xs focus:outline-none focus:border-neutral-900 shadow-2xs"
+                            placeholder="1"
+                            title="Saisir directement la quantité"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleQtyChange(idx, (it.quantity || 1) + 1)}
+                            className="w-6 h-6 flex items-center justify-center bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded text-xs transition-colors shrink-0"
+                            title="Augmenter la quantité (+1)"
+                          >
+                            +
+                          </button>
+                        </div>
                       </td>
 
                       {/* Unit Price */}

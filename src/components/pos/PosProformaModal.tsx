@@ -94,7 +94,7 @@ export const PosProformaModal: React.FC<PosProformaModalProps> = ({
         companyName: newClientCompany.trim() || undefined,
         phone: newClientPhone.trim() || '+243 00 000 0000',
         nif: newClientNif.trim() || undefined,
-        city: 'Kinshasa',
+        city: 'Lubumbashi',
         type: newClientCompany.trim() ? 'COMPANY' : 'INDIVIDUAL',
       });
       finalClientId = created.id;
@@ -321,7 +321,7 @@ export const PosProformaModal: React.FC<PosProformaModalProps> = ({
               rows={2}
               value={proformaNotes}
               onChange={(e) => setProformaNotes(e.target.value)}
-              placeholder="Ex: Modalités de paiement, délais de livraison à Kinshasa ou en provinces..."
+              placeholder="Ex: Modalités de paiement, délais de livraison à Lubumbashi ou en provinces..."
               className="w-full bg-white border border-neutral-300 rounded-xl px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
           </div>

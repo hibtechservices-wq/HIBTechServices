@@ -24,12 +24,23 @@ import {
   FileText,
   CreditCard,
   ChevronRight,
-  ExternalLink,
   FileSpreadsheet,
+  Globe,
+  Users as UsersIcon,
+  TrendingUp,
 } from 'lucide-react';
 
 export const ClientsView: React.FC = () => {
-  const { clients, sales, deleteClient, settings, setActiveWhatsAppClient, setActivePrintSale } = useApp();
+  const {
+    clients,
+    sales,
+    deleteClient,
+    settings,
+    setActiveWhatsAppClient,
+    setActivePrintSale,
+    setPortalClient,
+    setActiveTab,
+  } = useApp();
   const rate = settings.exchangeRateUSD_CDF || 2850;
 
   const [searchQuery, setSearchQuery] = useState('');
@@ -61,6 +72,26 @@ export const ClientsView: React.FC = () => {
     });
   }, [clients, searchQuery, filterType]);
 
+  // Aggregate metrics
+  const clientMetrics = useMemo(() => {
+    const totalDebts = clients.reduce((acc, c) => acc + (c.outstandingDebtUSD || 0), 0);
+    const totalSpent = clients.reduce((acc, c) => acc + (c.totalSpentUSD || 0), 0);
+    const debtorsCount = clients.filter((c) => c.outstandingDebtUSD > 0).length;
+    const companiesCount = clients.filter((c) => c.type === 'COMPANY').length;
+    const individualsCount = clients.filter((c) => c.type === 'INDIVIDUAL').length;
+
+    return {
+      totalCount: clients.length,
+      companiesCount,
+      individualsCount,
+      totalDebtsUSD: totalDebts,
+      totalDebtsCDF: Math.round(totalDebts * rate),
+      totalSpentUSD: totalSpent,
+      totalSpentCDF: Math.round(totalSpent * rate),
+      debtorsCount,
+    };
+  }, [clients, rate]);
+
   const handleExportExcel = () => {
     const data = filteredClients.map((c) => ({
       Nom_Complet: c.name,
@@ -91,117 +122,191 @@ export const ClientsView: React.FC = () => {
   return (
     <div className="space-y-6 pb-12">
       {/* Header */}
-      <div className="space-y-3">
+      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-2">
         <div>
-          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900">
-            Gestion des Clients & CRM
+          <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-slate-900">
+            Clients & Gestion des Créances
           </h1>
-          <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
-            Répertoire clients, suivi des créances, relances WhatsApp et historique d'achats.
+          <p className="text-xs sm:text-sm text-slate-500 mt-0.5">
+            Répertoire commercial, suivi des soldes débiteurs et relances directes WhatsApp.
           </p>
         </div>
 
-        {/* Action Buttons on single line under the title */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {/* PDF Report Button */}
+        {/* Action Buttons */}
+        <div className="flex items-center gap-2 flex-wrap">
           <button
             onClick={() => setIsReportModalOpen(true)}
-            className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors shadow-2xs shrink-0 whitespace-nowrap"
+            className="h-9 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
             title="Générer et télécharger l'état des créances et répertoire clients en PDF"
           >
-            <Printer className="w-3.5 h-3.5 text-emerald-200" />
+            <Printer className="w-3.5 h-3.5 text-slate-500" />
             <span>Relevé Créances (PDF)</span>
           </button>
 
-          {/* Excel Export Button */}
           <button
             onClick={handleExportExcel}
-            className="h-8 px-3 bg-white hover:bg-emerald-50 border border-neutral-300 hover:border-emerald-300 text-emerald-900 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors shadow-2xs shrink-0 whitespace-nowrap"
+            className="h-9 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
             title="Exporter tous les clients vers Microsoft Excel (.xlsx)"
           >
             <FileSpreadsheet className="w-3.5 h-3.5 text-emerald-600" />
-            <span>Excel (.xlsx)</span>
+            <span>Excel</span>
           </button>
 
-          {/* Excel Import Button */}
           <button
             onClick={() => setIsImportModalOpen(true)}
-            className="h-8 px-3 bg-white hover:bg-neutral-50 border border-neutral-300 text-neutral-800 rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors shadow-2xs shrink-0 whitespace-nowrap"
+            className="h-9 px-3 bg-white hover:bg-slate-50 border border-slate-200 text-slate-700 rounded-xl text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer"
             title="Importer des clients depuis un fichier Excel (.xlsx, .xls)"
           >
-            <Upload className="w-3.5 h-3.5 text-neutral-600" />
-            <span>Importer Excel</span>
+            <Upload className="w-3.5 h-3.5 text-slate-500" />
+            <span>Importer</span>
           </button>
-          
+
           <button
             onClick={() => {
               setClientToEdit(null);
               setIsCreateModalOpen(true);
             }}
-            className="h-8 px-3.5 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-colors shadow-xs shrink-0 whitespace-nowrap"
+            className="h-9 px-3.5 bg-slate-900 hover:bg-slate-800 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-1.5 transition-all shadow-xs cursor-pointer active:scale-95"
           >
-            <Plus className="w-3.5 h-3.5 text-amber-400" />
-            <span>+ Nouveau Client</span>
+            <Plus className="w-4 h-4 text-amber-400" />
+            <span>Nouveau Client</span>
           </button>
         </div>
       </div>
 
-      {/* Filters & Search */}
-      <div className="bg-white p-4 rounded-xl border border-neutral-200 shadow-2xs space-y-3">
-        <div className="flex flex-col sm:flex-row gap-3 items-center justify-between">
-          <div className="flex bg-neutral-100 p-0.5 rounded-lg text-xs w-full sm:w-auto overflow-x-auto">
-            <button
-              onClick={() => setFilterType('ALL')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors shrink-0 ${
-                filterType === 'ALL' ? 'bg-white text-neutral-900 font-semibold shadow-2xs' : 'text-neutral-600'
-              }`}
-            >
-              Tous les Clients ({clients.length})
-            </button>
-            <button
-              onClick={() => setFilterType('DEBTORS')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors shrink-0 text-rose-700 ${
-                filterType === 'DEBTORS' ? 'bg-white font-bold shadow-2xs' : 'text-rose-600'
-              }`}
-            >
-              Créances Dues ({clients.filter((c) => c.outstandingDebtUSD > 0).length})
-            </button>
-            <button
-              onClick={() => setFilterType('COMPANIES')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors shrink-0 ${
-                filterType === 'COMPANIES' ? 'bg-white text-neutral-900 font-semibold shadow-2xs' : 'text-neutral-600'
-              }`}
-            >
-              Entreprises ({clients.filter((c) => c.type === 'COMPANY').length})
-            </button>
-            <button
-              onClick={() => setFilterType('INDIVIDUALS')}
-              className={`px-3 py-1.5 rounded-md font-medium transition-colors shrink-0 ${
-                filterType === 'INDIVIDUALS' ? 'bg-white text-neutral-900 font-semibold shadow-2xs' : 'text-neutral-600'
-              }`}
-            >
-              Particuliers ({clients.filter((c) => c.type === 'INDIVIDUAL').length})
-            </button>
+      {/* Metrics Row */}
+      <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+        {/* Total Clients */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-[0_1px_3px_rgba(15,23,42,0.03)] space-y-2">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span className="font-medium text-slate-500">Répertoire Global</span>
+            <UsersIcon className="w-4 h-4 text-slate-400" />
           </div>
+          <div className="space-y-0.5">
+            <div className="text-xl sm:text-2xl font-bold font-mono-nums text-slate-900 tracking-tight">
+              {clientMetrics.totalCount}
+            </div>
+            <div className="text-[11px] text-slate-500">
+              {clientMetrics.companiesCount} sociétés · {clientMetrics.individualsCount} particuliers
+            </div>
+          </div>
+        </div>
 
-          <div className="relative w-full sm:w-72">
-            <input
-              type="text"
-              placeholder="Rechercher nom, téléphone, ville..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="w-full pl-9 pr-4 py-1.5 bg-neutral-50 border border-neutral-300 rounded-lg text-xs text-neutral-900 focus:outline-none focus:bg-white focus:border-neutral-900"
-            />
-            <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2" />
+        {/* Total Debts */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-[0_1px_3px_rgba(15,23,42,0.03)] space-y-2">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span className="font-medium text-slate-500">Créances Totales Dues</span>
+            <AlertCircle className="w-4 h-4 text-rose-500" />
           </div>
+          <div className="space-y-0.5">
+            <div className="text-xl sm:text-2xl font-bold font-mono-nums text-rose-600 tracking-tight">
+              ${clientMetrics.totalDebtsUSD.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[11px] font-mono-nums text-slate-500">
+              {clientMetrics.totalDebtsCDF.toLocaleString('fr-FR')} CDF
+            </div>
+          </div>
+        </div>
+
+        {/* Debtors Count */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-[0_1px_3px_rgba(15,23,42,0.03)] space-y-2">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span className="font-medium text-slate-500">Comptes Débiteurs</span>
+            <span className="text-[11px] font-mono font-bold text-rose-700 bg-rose-50 px-1.5 py-0.5 rounded">
+              {clientMetrics.debtorsCount}
+            </span>
+          </div>
+          <div className="space-y-0.5">
+            <div className="text-xl sm:text-2xl font-bold font-mono-nums text-slate-900 tracking-tight">
+              {clientMetrics.totalCount > 0 ? Math.round((clientMetrics.debtorsCount / clientMetrics.totalCount) * 100) : 0}%
+            </div>
+            <div className="text-[11px] text-slate-500">
+              des clients ont des factures en attente
+            </div>
+          </div>
+        </div>
+
+        {/* Total Spent */}
+        <div className="bg-white rounded-2xl border border-slate-200/80 p-4 shadow-[0_1px_3px_rgba(15,23,42,0.03)] space-y-2">
+          <div className="flex items-center justify-between text-slate-400 text-xs">
+            <span className="font-medium text-slate-500">Volume d'Affaires</span>
+            <TrendingUp className="w-4 h-4 text-emerald-600" />
+          </div>
+          <div className="space-y-0.5">
+            <div className="text-xl sm:text-2xl font-bold font-mono-nums text-emerald-700 tracking-tight">
+              ${clientMetrics.totalSpentUSD.toLocaleString('fr-FR', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            </div>
+            <div className="text-[11px] font-mono-nums text-slate-500">
+              Cumul des commandes et abonnements
+            </div>
+          </div>
+        </div>
+      </div>
+
+      {/* Filters & Search */}
+      <div className="flex flex-col sm:flex-row items-center justify-between gap-4 bg-white p-3 sm:p-4 rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.02)]">
+        <div className="flex items-center gap-1 overflow-x-auto w-full sm:w-auto pb-1 sm:pb-0">
+          {[
+            { id: 'ALL', label: 'Tous les clients', count: clients.length },
+            {
+              id: 'DEBTORS',
+              label: 'Créances dues',
+              count: clients.filter((c) => c.outstandingDebtUSD > 0).length,
+              danger: true,
+            },
+            {
+              id: 'COMPANIES',
+              label: 'Entreprises',
+              count: clients.filter((c) => c.type === 'COMPANY').length,
+            },
+            {
+              id: 'INDIVIDUALS',
+              label: 'Particuliers',
+              count: clients.filter((c) => c.type === 'INDIVIDUAL').length,
+            },
+          ].map((tab) => (
+            <button
+              key={tab.id}
+              onClick={() => setFilterType(tab.id as any)}
+              className={`px-3 py-1.5 rounded-xl text-xs font-semibold transition-all flex items-center gap-2 whitespace-nowrap cursor-pointer ${
+                filterType === tab.id
+                  ? 'bg-slate-900 text-white shadow-xs'
+                  : 'text-slate-600 hover:text-slate-900 hover:bg-slate-100'
+              }`}
+            >
+              <span>{tab.label}</span>
+              <span
+                className={`text-[10px] font-mono-nums font-semibold px-1.5 py-0.2 rounded-md ${
+                  filterType === tab.id
+                    ? 'bg-slate-800 text-amber-300'
+                    : tab.danger
+                    ? 'bg-rose-50 text-rose-700'
+                    : 'bg-slate-100 text-slate-500'
+                }`}
+              >
+                {tab.count}
+              </span>
+            </button>
+          ))}
+        </div>
+
+        <div className="relative w-full sm:w-72">
+          <input
+            type="text"
+            placeholder="Rechercher nom, téléphone, ville..."
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            className="w-full pl-9 pr-3 py-2 bg-slate-50 hover:bg-white focus:bg-white border border-slate-200 focus:border-slate-800 rounded-xl text-xs text-slate-900 placeholder:text-slate-400 focus:outline-none transition-all"
+          />
+          <Search className="w-4 h-4 text-slate-400 absolute left-3 top-1/2 -translate-y-1/2" />
         </div>
       </div>
 
       {/* Clients Cards Grid */}
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4">
         {filteredClients.length === 0 ? (
-          <div className="col-span-full bg-white p-12 text-center rounded-xl border border-neutral-200 text-neutral-400 text-xs">
-            Aucun client ne correspond à ce critère.
+          <div className="col-span-full bg-white p-16 text-center rounded-2xl border border-slate-200/80 text-slate-400 text-xs">
+            Aucun client ne correspond à ce critère de recherche.
           </div>
         ) : (
           filteredClients.map((client) => {
@@ -212,39 +317,53 @@ export const ClientsView: React.FC = () => {
             return (
               <div
                 key={client.id}
-                className="bg-white rounded-xl border border-neutral-200/90 shadow-2xs p-5 flex flex-col justify-between hover:border-neutral-400 transition-all group"
+                className="bg-white rounded-2xl border border-slate-200/80 shadow-[0_1px_3px_rgba(15,23,42,0.03)] p-5 flex flex-col justify-between hover:border-slate-300 hover:shadow-md transition-all group"
               >
                 <div>
                   {/* Top line: Type & Actions */}
                   <div className="flex items-start justify-between gap-2 mb-3">
-                    <div className="flex items-center gap-2">
-                      <div className="w-8 h-8 rounded-lg bg-neutral-100 text-neutral-700 flex items-center justify-center font-bold">
-                        {client.type === 'COMPANY' ? <Building className="w-4 h-4 text-amber-600" /> : <User className="w-4 h-4 text-blue-600" />}
+                    <div className="flex items-center gap-2.5">
+                      <div className="w-9 h-9 rounded-xl bg-slate-100 text-slate-700 flex items-center justify-center font-bold shrink-0">
+                        {client.type === 'COMPANY' ? (
+                          <Building className="w-4.5 h-4.5 text-slate-700" />
+                        ) : (
+                          <User className="w-4.5 h-4.5 text-slate-700" />
+                        )}
                       </div>
                       <div>
-                        <span className="text-[10px] uppercase font-semibold text-neutral-400 tracking-wider block">
+                        <span className="text-[10px] uppercase font-bold text-slate-400 tracking-wider block">
                           {client.type === 'COMPANY' ? 'Société / Entité' : 'Particulier'}
                         </span>
-                        <span className="text-[11px] text-neutral-500 font-medium">
-                          {client.city} {client.commune ? `(${client.commune})` : ''}
+                        <span className="text-[11px] text-slate-500 font-medium">
+                          {client.city} {client.commune ? `· ${client.commune}` : ''}
                         </span>
                       </div>
                     </div>
 
-                    <div className="flex items-center gap-1 opacity-80 group-hover:opacity-100">
+                    <div className="flex items-center gap-1">
+                      <button
+                        onClick={() => {
+                          setPortalClient(client);
+                          setActiveTab('portal');
+                        }}
+                        className="p-1.5 text-slate-400 hover:text-emerald-700 hover:bg-emerald-50 rounded-lg transition-colors cursor-pointer"
+                        title="Ouvrir le Portail Client en ligne"
+                      >
+                        <Globe className="w-3.5 h-3.5" />
+                      </button>
                       <button
                         onClick={() => {
                           setClientToEdit(client);
                           setIsCreateModalOpen(true);
                         }}
-                        className="p-1 text-neutral-400 hover:text-neutral-900 rounded"
+                        className="p-1.5 text-slate-400 hover:text-slate-800 hover:bg-slate-100 rounded-lg transition-colors cursor-pointer"
                         title="Modifier la fiche"
                       >
                         <Edit2 className="w-3.5 h-3.5" />
                       </button>
                       <button
                         onClick={() => setClientToDelete(client)}
-                        className="p-1 text-neutral-400 hover:text-rose-600 rounded"
+                        className="p-1.5 text-slate-400 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors cursor-pointer"
                         title="Supprimer"
                       >
                         <Trash2 className="w-3.5 h-3.5" />
@@ -253,30 +372,30 @@ export const ClientsView: React.FC = () => {
                   </div>
 
                   {/* Client Name */}
-                  <h3 className="font-bold text-sm text-neutral-900 leading-tight">
+                  <h3 className="font-bold text-sm text-slate-900 leading-tight">
                     {client.name}
                   </h3>
                   {client.companyName && (
-                    <p className="text-xs text-neutral-500 font-medium mt-0.5">
+                    <p className="text-xs text-slate-500 font-medium mt-0.5">
                       {client.companyName}
                     </p>
                   )}
 
                   {/* Contact Info */}
-                  <div className="mt-3 space-y-1 text-xs text-neutral-600">
+                  <div className="mt-3 space-y-1.5 text-xs text-slate-600">
                     <div className="flex items-center gap-2">
-                      <Phone className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                      <span className="font-mono-nums font-medium">{client.phone}</span>
+                      <Phone className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                      <span className="font-mono-nums font-medium text-slate-700">{client.phone}</span>
                     </div>
                     {client.email && (
                       <div className="flex items-center gap-2 truncate">
-                        <Mail className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
-                        <span className="truncate">{client.email}</span>
+                        <Mail className="w-3.5 h-3.5 text-slate-400 shrink-0" />
+                        <span className="truncate text-slate-500">{client.email}</span>
                       </div>
                     )}
                     {client.address && (
-                      <div className="flex items-center gap-2 truncate text-[11px] text-neutral-500">
-                        <MapPin className="w-3.5 h-3.5 text-neutral-400 shrink-0" />
+                      <div className="flex items-center gap-2 truncate text-[11px] text-slate-500">
+                        <MapPin className="w-3.5 h-3.5 text-slate-400 shrink-0" />
                         <span className="truncate">{client.address}</span>
                       </div>
                     )}
@@ -284,31 +403,31 @@ export const ClientsView: React.FC = () => {
                 </div>
 
                 {/* Financial Summary & Bottom Actions */}
-                <div className="mt-4 pt-3 border-t border-neutral-100 space-y-3">
+                <div className="mt-4 pt-3.5 border-t border-slate-100 space-y-3">
                   <div className="grid grid-cols-2 gap-2 text-xs">
-                    <div className="bg-neutral-50 p-2 rounded-lg">
-                      <span className="text-[10px] text-neutral-500 block">Total Dépensé</span>
-                      <span className="font-bold font-mono-nums text-neutral-900 block">
+                    <div className="bg-slate-50 p-2.5 rounded-xl border border-slate-100">
+                      <span className="text-[10px] text-slate-400 block font-medium">Total Dépensé</span>
+                      <span className="font-bold font-mono-nums text-slate-900 block mt-0.5">
                         ${client.totalSpentUSD.toFixed(2)}
                       </span>
                     </div>
 
-                    <div className={`p-2 rounded-lg ${hasDebt ? 'bg-rose-50 border border-rose-200' : 'bg-neutral-50'}`}>
-                      <span className={`text-[10px] block ${hasDebt ? 'text-rose-700 font-semibold' : 'text-neutral-500'}`}>
-                        {hasDebt ? 'Créance Dégagée' : 'Solde Régularisé'}
+                    <div className={`p-2.5 rounded-xl border ${hasDebt ? 'bg-rose-50/70 border-rose-200/80' : 'bg-slate-50 border-slate-100'}`}>
+                      <span className={`text-[10px] block font-medium ${hasDebt ? 'text-rose-700 font-semibold' : 'text-slate-400'}`}>
+                        {hasDebt ? 'Créance à Recouvrer' : 'Solde Régularisé'}
                       </span>
-                      <span className={`font-bold font-mono-nums block ${hasDebt ? 'text-rose-700' : 'text-emerald-700'}`}>
+                      <span className={`font-bold font-mono-nums block mt-0.5 ${hasDebt ? 'text-rose-700' : 'text-emerald-700'}`}>
                         {hasDebt ? `$${client.outstandingDebtUSD.toFixed(2)}` : '$0.00'}
                       </span>
                     </div>
                   </div>
 
-                  {/* Buttons */}
+                  {/* Action Buttons */}
                   <div className="flex items-center gap-2">
                     {hasDebt ? (
                       <button
                         onClick={() => setActiveWhatsAppClient({ client, sale: null })}
-                        className="flex-1 py-1.5 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-lg text-xs flex items-center justify-center gap-1.5 transition-colors shadow-2xs"
+                        className="flex-1 py-2 px-3 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold rounded-xl text-xs flex items-center justify-center gap-1.5 transition-colors shadow-2xs cursor-pointer active:scale-95"
                       >
                         <MessageSquare className="w-3.5 h-3.5" />
                         <span>Relancer WhatsApp</span>
@@ -316,16 +435,16 @@ export const ClientsView: React.FC = () => {
                     ) : (
                       <button
                         onClick={() => setSelectedClientForDetails(client)}
-                        className="flex-1 py-1.5 px-3 bg-neutral-100 hover:bg-neutral-200 text-neutral-800 font-medium rounded-lg text-xs flex items-center justify-center gap-1 transition-colors"
+                        className="flex-1 py-2 px-3 bg-slate-100 hover:bg-slate-200 text-slate-800 font-medium rounded-xl text-xs flex items-center justify-center gap-1 transition-colors cursor-pointer"
                       >
-                        <FileText className="w-3.5 h-3.5" />
+                        <FileText className="w-3.5 h-3.5 text-slate-500" />
                         <span>Historique Achats</span>
                       </button>
                     )}
 
                     <button
                       onClick={() => setSelectedClientForDetails(client)}
-                      className="p-1.5 border border-neutral-300 hover:bg-neutral-50 rounded-lg text-neutral-600 transition-colors"
+                      className="p-2 border border-slate-200 hover:bg-slate-100 rounded-xl text-slate-600 transition-colors cursor-pointer"
                       title="Voir détails & historique complet"
                     >
                       <ChevronRight className="w-4 h-4" />
@@ -340,18 +459,18 @@ export const ClientsView: React.FC = () => {
 
       {/* Client History & Invoices Drawer */}
       {selectedClientForDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl border border-neutral-200 overflow-hidden my-auto flex flex-col max-h-[90vh]">
-            <div className="flex items-center justify-between px-6 py-4 border-b border-neutral-100 bg-neutral-900 text-white">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-950/60 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-2xl border border-slate-200 overflow-hidden my-auto flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-150">
+            <div className="flex items-center justify-between px-6 py-4 border-b border-slate-800 bg-slate-900 text-white">
               <div>
                 <h3 className="font-bold text-base">{selectedClientForDetails.name}</h3>
-                <p className="text-xs text-neutral-400">
+                <p className="text-xs text-slate-400">
                   {selectedClientForDetails.phone} · {selectedClientForDetails.city}
                 </p>
               </div>
               <button
                 onClick={() => setSelectedClientForDetails(null)}
-                className="text-neutral-400 hover:text-white p-1 rounded-lg"
+                className="text-slate-400 hover:text-white p-1 rounded-lg"
               >
                 ✕
               </button>
@@ -359,15 +478,15 @@ export const ClientsView: React.FC = () => {
 
             <div className="p-6 overflow-y-auto space-y-4 text-xs">
               {/* Balances */}
-              <div className="grid grid-cols-2 gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-200">
+              <div className="grid grid-cols-2 gap-4 bg-slate-50 p-4 rounded-xl border border-slate-200">
                 <div>
-                  <span className="text-neutral-500 block">Total Achats & Prestations :</span>
-                  <span className="font-bold text-lg font-mono-nums text-neutral-900">
+                  <span className="text-slate-500 block">Total Achats & Prestations :</span>
+                  <span className="font-bold text-lg font-mono-nums text-slate-900">
                     ${selectedClientForDetails.totalSpentUSD.toFixed(2)}
                   </span>
                 </div>
                 <div>
-                  <span className="text-neutral-500 block">Solde Restant Dû :</span>
+                  <span className="text-slate-500 block">Solde Restant Dû :</span>
                   <span className={`font-bold text-lg font-mono-nums ${selectedClientForDetails.outstandingDebtUSD > 0 ? 'text-rose-600' : 'text-emerald-700'}`}>
                     ${selectedClientForDetails.outstandingDebtUSD.toFixed(2)}
                   </span>
@@ -376,22 +495,22 @@ export const ClientsView: React.FC = () => {
 
               {/* Transactions List */}
               <div>
-                <h4 className="font-bold text-neutral-800 mb-2 uppercase tracking-wider text-[11px]">
+                <h4 className="font-bold text-slate-800 mb-2 uppercase tracking-wider text-[11px]">
                   Factures & Reçus Associés ({clientSales.length})
                 </h4>
 
                 {clientSales.length === 0 ? (
-                  <p className="text-neutral-400 py-4 text-center">Aucune transaction enregistrée pour ce client.</p>
+                  <p className="text-slate-400 py-4 text-center">Aucune transaction enregistrée pour ce client.</p>
                 ) : (
-                  <div className="border border-neutral-200 rounded-lg overflow-hidden divide-y divide-neutral-100">
+                  <div className="border border-slate-200 rounded-xl overflow-hidden divide-y divide-slate-100">
                     {clientSales.map((s) => (
-                      <div key={s.id} className="p-3 flex items-center justify-between hover:bg-neutral-50">
+                      <div key={s.id} className="p-3 flex items-center justify-between hover:bg-slate-50">
                         <div>
-                          <span className="font-bold font-mono-nums text-neutral-900 block">{s.saleNumber}</span>
-                          <span className="text-[11px] text-neutral-500">{formatDate(s.createdAt)}</span>
+                          <span className="font-bold font-mono-nums text-slate-900 block">{s.saleNumber}</span>
+                          <span className="text-[11px] text-slate-500">{formatDate(s.createdAt)}</span>
                         </div>
                         <div className="text-right font-mono-nums">
-                          <span className="font-bold text-neutral-900 block">${s.totalUSD.toFixed(2)}</span>
+                          <span className="font-bold text-slate-900 block">${s.totalUSD.toFixed(2)}</span>
                           <span className="text-[11px] text-emerald-700">Encaissé: ${s.amountPaidUSD.toFixed(2)}</span>
                         </div>
                         <button
@@ -399,7 +518,7 @@ export const ClientsView: React.FC = () => {
                             setSelectedClientForDetails(null);
                             setActivePrintSale(s);
                           }}
-                          className="px-2.5 py-1 text-xs bg-neutral-900 text-white rounded font-medium ml-3"
+                          className="px-2.5 py-1 text-xs bg-slate-900 hover:bg-slate-800 text-white rounded-lg font-medium ml-3 cursor-pointer"
                         >
                           Imprimer
                         </button>

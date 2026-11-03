@@ -2,7 +2,9 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { CompanySettings } from '../../types';
 import { exportToExcel } from '../../utils/excelUtils';
-import { generateDefaultStampSvg, generateDefaultSignatureSvg } from '../../utils/stampGenerator';
+import { exportSyscohadaJournal } from '../../utils/ohadaExport';
+import { AuditTrailModal } from '../audit/AuditTrailModal';
+import { generateDefaultStampSvg, generateDefaultSignatureSvg, generateCashPaidStampSvg } from '../../utils/stampGenerator';
 import {
   Building,
   Save,
@@ -16,6 +18,7 @@ import {
   CreditCard,
   Check,
   ShieldCheck,
+  ShieldAlert,
   AlertTriangle,
   AlertCircle,
   Ban,
@@ -26,6 +29,8 @@ import {
   Image as ImageIcon,
   Trash2,
   Sparkles,
+  Printer,
+  Banknote,
 } from 'lucide-react';
 
 export const SettingsView: React.FC = () => {
@@ -40,9 +45,11 @@ export const SettingsView: React.FC = () => {
     resetToDemoData,
     exportDatabaseJSON,
     importDatabaseJSON,
+    setIsDataWipeModalOpen,
   } = useApp();
 
   const [formData, setFormData] = useState<CompanySettings>({ ...settings });
+  const [isAuditModalOpen, setIsAuditModalOpen] = useState(false);
   const [saveSuccess, setSaveSuccess] = useState(false);
   const [importError, setImportError] = useState(false);
 
@@ -155,7 +162,7 @@ export const SettingsView: React.FC = () => {
     reader.readAsText(file);
   };
 
-  const handleImageUpload = (field: 'logoUrl' | 'signatureUrl' | 'stampUrl', file?: File) => {
+  const handleImageUpload = (field: 'logoUrl' | 'signatureUrl' | 'stampUrl' | 'cashPaidStampUrl', file?: File) => {
     if (!file) return;
     if (file.size > 3 * 1024 * 1024) {
       alert("L'image sélectionnée est trop lourde (maximum 3 Mo).");
@@ -177,6 +184,11 @@ export const SettingsView: React.FC = () => {
   const handleGenerateDefaultSignature = () => {
     const sig = generateDefaultSignatureSvg(formData.signatoryName || 'La Gérance');
     handleChange('signatureUrl', sig);
+  };
+
+  const handleGenerateCashPaidStamp = () => {
+    const cashStamp = generateCashPaidStampSvg(formData.name, formData.cashierName);
+    handleChange('cashPaidStampUrl', cashStamp);
   };
 
   return (
@@ -238,7 +250,7 @@ export const SettingsView: React.FC = () => {
                 type="text"
                 value={formData.dgiCenter || ''}
                 onChange={(e) => handleChange('dgiCenter', e.target.value)}
-                placeholder="Ex: Centre des Impôts (CDI Gombe)"
+                placeholder="Ex: Centre des Impôts (CDI)"
                 className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-neutral-900 focus:outline-none focus:bg-white font-medium"
               />
             </div>
@@ -496,7 +508,7 @@ export const SettingsView: React.FC = () => {
 
             <div>
               <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
-                Adresse & Ville (Kinshasa, Lubumbashi...)
+                Adresse & Ville (Lubumbashi, Haut-Katanga...)
               </label>
               <input
                 type="text"
@@ -631,7 +643,7 @@ export const SettingsView: React.FC = () => {
             </div>
           </div>
 
-          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-4 gap-5">
             {/* 5.1 Logo de l'Entreprise */}
             <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 flex flex-col justify-between">
               <div>
@@ -868,6 +880,140 @@ export const SettingsView: React.FC = () => {
                 </div>
               </div>
             </div>
+
+            {/* 5.4 Cachet PAYÉ CASH (Paiements Comptant & Espèces) */}
+            <div className="p-4 bg-neutral-50 border border-neutral-200 rounded-xl space-y-3 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between mb-2">
+                  <div className="flex items-center gap-2">
+                    <Banknote className="w-4 h-4 text-rose-600" />
+                    <span className="font-bold text-neutral-900 text-xs uppercase tracking-wider">Cachet "PAYÉ CASH"</span>
+                  </div>
+                  {formData.cashPaidStampUrl && (
+                    <button
+                      type="button"
+                      onClick={() => handleChange('cashPaidStampUrl', '')}
+                      className="text-rose-600 hover:text-rose-700 text-[11px] font-semibold flex items-center gap-1"
+                    >
+                      <Trash2 className="w-3.5 h-3.5" />
+                      <span>Retirer</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="h-32 border-2 border-dashed border-neutral-300 rounded-lg bg-white flex flex-col items-center justify-center p-3 text-center overflow-hidden">
+                  {formData.cashPaidStampUrl ? (
+                    <img
+                      src={formData.cashPaidStampUrl}
+                      alt="Cachet Payé Cash"
+                      className="max-h-full max-w-full object-contain"
+                    />
+                  ) : (
+                    <div className="text-neutral-400 flex flex-col items-center gap-1.5">
+                      <Banknote className="w-8 h-8 stroke-1 text-neutral-300" />
+                      <span className="text-[11px] font-medium">Aucun cachet cash configuré</span>
+                      <span className="text-[9px] text-neutral-400">Tampon "PAYÉ CASH" encre rouge</span>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <div className="grid grid-cols-2 gap-1.5">
+                  <label className="py-2 px-2 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 cursor-pointer transition-colors">
+                    <Upload className="w-3.5 h-3.5" />
+                    <span className="truncate">Téléverser</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      onChange={(e) => handleImageUpload('cashPaidStampUrl', e.target.files?.[0])}
+                      className="hidden"
+                    />
+                  </label>
+
+                  <button
+                    type="button"
+                    onClick={handleGenerateCashPaidStamp}
+                    className="py-2 px-2 bg-rose-50 hover:bg-rose-100 text-rose-800 border border-rose-200 rounded-lg text-xs font-semibold flex items-center justify-center gap-1.5 transition-colors"
+                    title="Générer automatiquement un tampon officiel PAYÉ CASH"
+                  >
+                    <Sparkles className="w-3.5 h-3.5 text-rose-600" />
+                    <span className="truncate">Générer Cachet</span>
+                  </button>
+                </div>
+
+                <div className="space-y-1.5 pt-1">
+                  <label className="flex items-start gap-2 text-xs text-neutral-700 cursor-pointer pt-0.5">
+                    <input
+                      type="checkbox"
+                      checked={formData.includeCashPaidStampByDefault !== false}
+                      onChange={(e) => handleChange('includeCashPaidStampByDefault', e.target.checked)}
+                      className="rounded border-neutral-300 text-rose-600 focus:ring-rose-500 mt-0.5 shrink-0"
+                    />
+                    <span className="leading-tight">
+                      Apposer automatiquement le Cachet PAYÉ CASH sur les factures et reçus réglés en Espèces (Cash)
+                    </span>
+                  </label>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Direct Print & Automatic PDF Export (C:\hibtech) */}
+          <div className="p-4 bg-amber-50/70 border border-amber-200 rounded-xl space-y-3">
+            <div className="flex items-center gap-2">
+              <Printer className="w-4 h-4 text-amber-700" />
+              <h3 className="font-bold text-xs uppercase tracking-wider text-amber-950">
+                Impression Directe & Sauvegarde PDF Automatique (Dossier C:\hibtech)
+              </h3>
+            </div>
+            <p className="text-xs text-amber-900 leading-relaxed">
+              Lors de l'appui sur <strong className="font-bold">Imprimer</strong>, le document est envoyé sans délai à l'imprimante par défaut de votre ordinateur, le fichier PDF haute résolution est immédiatement téléchargé pour être archivé dans le dossier cible, et la fenêtre se referme automatiquement.
+            </p>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4 pt-1">
+              <div>
+                <label className="block text-[11px] font-bold text-neutral-700 uppercase mb-1">
+                  Dossier Racine d'Exportation PDF
+                </label>
+                <div className="relative">
+                  <input
+                    type="text"
+                    value={formData.pdfExportPath || 'C:\\hibtech'}
+                    onChange={(e) => handleChange('pdfExportPath', e.target.value)}
+                    placeholder="C:\hibtech"
+                    className="w-full bg-white border border-neutral-300 rounded-lg pl-3 pr-24 py-2 text-xs font-mono font-bold text-neutral-900 focus:outline-none focus:border-amber-500"
+                  />
+                  <span className="absolute right-2 top-2 text-[10px] bg-amber-100 text-amber-900 px-2 py-0.5 rounded font-mono font-bold">
+                    Racine Locale
+                  </span>
+                </div>
+                <p className="text-[10px] text-neutral-500 mt-1">
+                  Astuce navigateur : pour que vos téléchargements aillent directement dans ce dossier sans invite de confirmation, configurez le dossier de téléchargement de Google Chrome ou Microsoft Edge sur <code className="font-mono bg-neutral-100 px-1 py-0.2 rounded font-bold">C:\hibtech</code>.
+                </p>
+              </div>
+
+              <div className="space-y-2 pt-1">
+                <label className="flex items-center gap-2 text-xs text-neutral-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.autoDownloadPdfOnPrint !== false}
+                    onChange={(e) => handleChange('autoDownloadPdfOnPrint', e.target.checked)}
+                    className="rounded border-neutral-300 text-amber-600 focus:ring-amber-500 w-4 h-4"
+                  />
+                  <span className="font-medium">Télécharger immédiatement le PDF lors du clic sur Imprimer</span>
+                </label>
+
+                <label className="flex items-center gap-2 text-xs text-neutral-800 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={formData.autoCloseModalOnPrint !== false}
+                    onChange={(e) => handleChange('autoCloseModalOnPrint', e.target.checked)}
+                    className="rounded border-neutral-300 text-amber-600 focus:ring-amber-500 w-4 h-4"
+                  />
+                  <span className="font-medium">Fermer automatiquement la fenêtre d'impression dès l'envoi</span>
+                </label>
+              </div>
+            </div>
           </div>
 
           {/* Mentions de bas de page de la facture */}
@@ -907,14 +1053,36 @@ export const SettingsView: React.FC = () => {
         </div>
 
         <div className="flex flex-wrap items-center gap-2.5 pt-2">
+          {/* Export SYSCOHADA */}
+          <button
+            type="button"
+            onClick={() => exportSyscohadaJournal(sales, expenses, settings, settings.exchangeRateUSD_CDF || 2850)}
+            className="h-9 px-4 bg-emerald-800 hover:bg-emerald-900 text-white rounded-lg text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors shadow-2xs shrink-0"
+            title="Exporter le Journal Comptable Conforme SYSCOHADA (Ventes, Caisse, Balance)"
+          >
+            <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
+            <span>Journal Comptable SYSCOHADA (.xlsx)</span>
+          </button>
+
+          {/* Audit Trail Button */}
+          <button
+            type="button"
+            onClick={() => setIsAuditModalOpen(true)}
+            className="h-9 px-4 bg-neutral-900 hover:bg-neutral-800 text-amber-400 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors shadow-2xs shrink-0"
+            title="Consulter le journal d'audit de sécurité des opérations sensibles"
+          >
+            <ShieldAlert className="w-4 h-4 text-rose-400" />
+            <span>Journal d'Audit des Actions Sensibles</span>
+          </button>
+
           <button
             type="button"
             onClick={handleExportMasterExcel}
-            className="h-9 px-4 bg-emerald-700 hover:bg-emerald-800 text-white rounded-lg text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors shadow-2xs shrink-0"
+            className="h-9 px-4 bg-neutral-100 hover:bg-neutral-200 text-neutral-900 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors border border-neutral-300 shrink-0"
             title="Exporter l'intégralité de l'entreprise (Factures, Stock, Clients, Dépenses, Équipements) dans un fichier Excel multi-feuilles"
           >
-            <FileSpreadsheet className="w-4 h-4 text-emerald-200" />
-            <span>Grand Livre Excel Complet (.XLSX Multi-Feuilles)</span>
+            <FileSpreadsheet className="w-4 h-4 text-emerald-600" />
+            <span>Grand Livre Excel Global</span>
           </button>
 
           <button
@@ -939,19 +1107,87 @@ export const SettingsView: React.FC = () => {
 
           <button
             type="button"
-            onClick={() => {
-              if (window.confirm('Voulez-vous recharger les données de démonstration de la RDC avec les normes DGI ?')) {
-                resetToDemoData();
-                alert('Données de démonstration RDC rechargées avec succès !');
-              }
-            }}
+            onClick={() => setIsDataWipeModalOpen(true)}
             className="h-9 px-4 bg-rose-50 hover:bg-rose-100 text-rose-700 rounded-lg text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors border border-rose-200 sm:ml-auto shrink-0"
+            title="Ouvrir les options de réinitialisation ou suppression des données"
           >
             <RotateCcw className="w-4 h-4 text-rose-600" />
             <span>Réinitialiser Données Démo DGI RDC</span>
           </button>
         </div>
       </div>
+
+      {/* 7. Zone Danger : Suppression & Purge des Données */}
+      <div className="bg-rose-50/70 p-6 rounded-xl border-2 border-rose-200 shadow-2xs space-y-4">
+        <div className="flex items-center justify-between pb-2 border-b border-rose-200">
+          <div className="flex items-center gap-2.5">
+            <div className="w-8 h-8 rounded-lg bg-rose-600 text-white flex items-center justify-center shrink-0 shadow-xs">
+              <Trash2 className="w-4 h-4" />
+            </div>
+            <div>
+              <h2 className="font-bold text-rose-950 text-sm uppercase tracking-wider flex items-center gap-2">
+                <span>7. Suppression & Purge des Données de l'Application</span>
+                <span className="text-[10px] bg-rose-600 text-white font-extrabold px-2 py-0.5 rounded-full uppercase tracking-wider">
+                  Zone Sensible
+                </span>
+              </h2>
+              <p className="text-xs text-rose-800 mt-0.5">
+                Purger les factures/ventes de test, vider les données de démonstration ou réinitialiser complètement l'application pour démarrer la production.
+              </p>
+            </div>
+          </div>
+        </div>
+
+        {/* Database state indicators */}
+        <div className="grid grid-cols-2 sm:grid-cols-5 gap-2 text-center text-xs">
+          <div className="bg-white p-2.5 rounded-xl border border-rose-200 shadow-2xs">
+            <span className="block text-base font-black text-rose-950 font-mono-nums">{sales.length}</span>
+            <span className="text-[11px] text-neutral-600">Ventes & Factures</span>
+          </div>
+          <div className="bg-white p-2.5 rounded-xl border border-rose-200 shadow-2xs">
+            <span className="block text-base font-black text-rose-950 font-mono-nums">{products.length}</span>
+            <span className="text-[11px] text-neutral-600">Articles Stock</span>
+          </div>
+          <div className="bg-white p-2.5 rounded-xl border border-rose-200 shadow-2xs">
+            <span className="block text-base font-black text-rose-950 font-mono-nums">{clients.length}</span>
+            <span className="text-[11px] text-neutral-600">Clients</span>
+          </div>
+          <div className="bg-white p-2.5 rounded-xl border border-rose-200 shadow-2xs">
+            <span className="block text-base font-black text-rose-950 font-mono-nums">{expenses.length}</span>
+            <span className="text-[11px] text-neutral-600">Dépenses</span>
+          </div>
+          <div className="bg-white p-2.5 rounded-xl border border-rose-200 shadow-2xs col-span-2 sm:col-span-1">
+            <span className="block text-base font-black text-rose-950 font-mono-nums">{equipments.length}</span>
+            <span className="text-[11px] text-neutral-600">Équipements</span>
+          </div>
+        </div>
+
+        <div className="flex flex-wrap items-center gap-3 pt-1">
+          <button
+            type="button"
+            onClick={() => setIsDataWipeModalOpen(true)}
+            className="h-10 px-5 bg-rose-600 hover:bg-rose-700 text-white rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-all shadow-sm hover:shadow-md active:scale-98 shrink-0 cursor-pointer"
+          >
+            <Trash2 className="w-4 h-4" />
+            <span>Supprimer les Données de l'Application...</span>
+          </button>
+
+          <button
+            type="button"
+            onClick={() => setIsDataWipeModalOpen(true)}
+            className="h-10 px-4 bg-white hover:bg-rose-100 text-rose-800 rounded-xl text-xs font-bold inline-flex items-center justify-center gap-2 transition-colors border border-rose-300 shadow-2xs shrink-0 cursor-pointer"
+          >
+            <RotateCcw className="w-4 h-4 text-rose-600" />
+            <span>Purger Seules les Transactions / Reset Usine</span>
+          </button>
+        </div>
+      </div>
+
+      {/* Audit Trail Modal */}
+      <AuditTrailModal
+        isOpen={isAuditModalOpen}
+        onClose={() => setIsAuditModalOpen(false)}
+      />
     </div>
   );
 };

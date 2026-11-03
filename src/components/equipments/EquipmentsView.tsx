@@ -9,6 +9,10 @@ import { EquipmentPrintModal } from './EquipmentPrintModal';
 import { EquipmentsReportModal } from './EquipmentsReportModal';
 import { ExcelImportModal } from '../common/ExcelImportModal';
 import { ConfirmDeleteModal } from '../common/ConfirmDeleteModal';
+import { DeliveryNotesList } from '../operations/DeliveryNotesList';
+import { WorkOrdersList } from '../operations/WorkOrdersList';
+import { SubscriptionsList } from '../operations/SubscriptionsList';
+import { StarlinkSupervisionDashboard } from './StarlinkSupervisionDashboard';
 import {
   Radio,
   Video,
@@ -34,11 +38,15 @@ import {
   Shield,
   Tag,
   FileSpreadsheet,
+  Truck,
+  Wrench,
+  CreditCard,
 } from 'lucide-react';
 
 export const EquipmentsView: React.FC = () => {
-  const { equipments, deleteEquipment, clients } = useApp();
+  const { equipments, deleteEquipment, clients, deliveryNotes, workOrders, subscriptions } = useApp();
 
+  const [activeSubTab, setActiveSubTab] = useState<'PARC' | 'SUPERVISION' | 'DELIVERY_NOTES' | 'WORK_ORDERS' | 'SUBSCRIPTIONS'>('PARC');
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedType, setSelectedType] = useState<'ALL' | EquipmentType>('ALL');
   const [selectedStatus, setSelectedStatus] = useState<'ALL' | EquipmentStatus>('ALL');
@@ -87,6 +95,25 @@ export const EquipmentsView: React.FC = () => {
   const apCount = useMemo(() => equipments.filter((e) => e.type === 'ACCESS_POINT').length, [equipments]);
   const activeCount = useMemo(() => equipments.filter((e) => e.status === 'ACTIVE').length, [equipments]);
   const maintenanceCount = useMemo(() => equipments.filter((e) => e.status === 'MAINTENANCE' || e.status === 'OFFLINE').length, [equipments]);
+
+  const subAlertCount = useMemo(() => {
+    return subscriptions.filter((s) => {
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const due = new Date(s.nextBillingDate);
+      due.setHours(0, 0, 0, 0);
+      const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+      return s.status === 'OVERDUE' || diff <= 7;
+    }).length;
+  }, [subscriptions]);
+
+  const pendingDeliveriesCount = useMemo(() => {
+    return deliveryNotes.filter((n) => n.status === 'PENDING' || n.status === 'IN_TRANSIT').length;
+  }, [deliveryNotes]);
+
+  const openMissionsCount = useMemo(() => {
+    return workOrders.filter((o) => o.status === 'SCHEDULED' || o.status === 'IN_PROGRESS').length;
+  }, [workOrders]);
 
   const handleExportExcel = () => {
     const data = filteredEquipments.map((eq) => ({
@@ -164,29 +191,129 @@ export const EquipmentsView: React.FC = () => {
   return (
     <div className="space-y-6 pb-12 font-sans">
       {/* Header */}
-      <div className="space-y-3">
+      <div className="space-y-4">
         <div>
           <div className="flex items-center gap-2">
             <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-neutral-900">
-              Configurations Équipements & Réseaux
+              Opérations, Terrain & Parc Réseau
             </h1>
-            <span className="text-[10px] bg-amber-100 text-amber-900 font-bold px-2 py-0.5 rounded-full uppercase">
-              Starlink · CCTV · NVR · Réseau
+            <span className="text-[10px] bg-blue-100 text-blue-900 font-bold px-2 py-0.5 rounded-full uppercase">
+              Starlink · Vidéosurveillance · Télécoms RDC
             </span>
           </div>
           <p className="text-xs sm:text-sm text-neutral-500 mt-0.5">
-            Gestion technique des kits Starlink, caméras IP, enregistreurs NVR, routeurs MikroTik et bornes Wi-Fi.
+            Bons de livraison (BL), fiches d'intervention technique, suivi des abonnements Starlink récurrents & contrats SAV.
           </p>
         </div>
 
-        {/* Action Buttons on single line under the title */}
-        <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
-          {/* PDF Fleet Report Button */}
+        {/* 4 Operations Sub-Tabs Navigation */}
+        <div className="flex border-b border-neutral-200 gap-1 sm:gap-3 overflow-x-auto no-scrollbar pt-1">
           <button
-            onClick={() => setIsReportModalOpen(true)}
-            className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors shadow-2xs shrink-0 whitespace-nowrap"
-            title="Générer et télécharger l'inventaire complet du parc en PDF"
+            onClick={() => setActiveSubTab('PARC')}
+            className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'PARC'
+                ? 'border-blue-600 text-blue-600 font-bold'
+                : 'border-transparent text-neutral-600 hover:text-neutral-900'
+            }`}
           >
+            <Server className="w-4 h-4 text-sky-600" />
+            <span>Parc Équipements & Réseau</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-neutral-100 text-neutral-700">
+              {equipments.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('SUPERVISION')}
+            className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'SUPERVISION'
+                ? 'border-indigo-600 text-indigo-600 font-bold'
+                : 'border-transparent text-neutral-600 hover:text-neutral-900'
+            }`}
+          >
+            <Radio className="w-4 h-4 text-indigo-600" />
+            <span>Supervision Starlink (1TB & Télémétrie)</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-indigo-100 text-indigo-800">
+              {starlinkCount}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('DELIVERY_NOTES')}
+            className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'DELIVERY_NOTES'
+                ? 'border-blue-600 text-blue-600 font-bold'
+                : 'border-transparent text-neutral-600 hover:text-neutral-900'
+            }`}
+          >
+            <Truck className="w-4 h-4 text-blue-600" />
+            <span>Bons de Livraison & Décharges (BL)</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-blue-100 text-blue-800">
+              {deliveryNotes.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('WORK_ORDERS')}
+            className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'WORK_ORDERS'
+                ? 'border-blue-600 text-blue-600 font-bold'
+                : 'border-transparent text-neutral-600 hover:text-neutral-900'
+            }`}
+          >
+            <Wrench className="w-4 h-4 text-amber-600" />
+            <span>Ordres de Mission & Interventions</span>
+            <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-amber-100 text-amber-900">
+              {workOrders.length}
+            </span>
+          </button>
+
+          <button
+            onClick={() => setActiveSubTab('SUBSCRIPTIONS')}
+            className={`pb-3 px-3.5 text-xs sm:text-sm font-semibold flex items-center gap-2 border-b-2 transition-all cursor-pointer whitespace-nowrap ${
+              activeSubTab === 'SUBSCRIPTIONS'
+                ? 'border-blue-600 text-blue-600 font-bold'
+                : 'border-transparent text-neutral-600 hover:text-neutral-900'
+            }`}
+          >
+            <CreditCard className="w-4 h-4 text-purple-600" />
+            <span>Abonnements & Contrats SAV</span>
+            {subAlertCount > 0 ? (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-bold bg-rose-100 text-rose-700 animate-pulse">
+                {subAlertCount} alerte(s)
+              </span>
+            ) : (
+              <span className="px-1.5 py-0.5 rounded-full text-[10px] font-mono font-bold bg-purple-100 text-purple-800">
+                {subscriptions.length}
+              </span>
+            )}
+          </button>
+        </div>
+      </div>
+
+      {/* Tab: Supervision Starlink */}
+      {activeSubTab === 'SUPERVISION' && <StarlinkSupervisionDashboard />}
+
+      {/* Tab 2: Bons de Livraison */}
+      {activeSubTab === 'DELIVERY_NOTES' && <DeliveryNotesList />}
+
+      {/* Tab 3: Ordres de Mission */}
+      {activeSubTab === 'WORK_ORDERS' && <WorkOrdersList />}
+
+      {/* Tab 4: Abonnements & Contrats SAV */}
+      {activeSubTab === 'SUBSCRIPTIONS' && <SubscriptionsList />}
+
+      {/* Tab 1: Parc Équipements Original */}
+      {activeSubTab === 'PARC' && (
+        <div className="space-y-6">
+          {/* Action Buttons on single line under the title */}
+          <div className="flex items-center gap-2 overflow-x-auto pb-1 no-scrollbar">
+            {/* PDF Fleet Report Button */}
+            <button
+              onClick={() => setIsReportModalOpen(true)}
+              className="h-8 px-3 bg-emerald-600 hover:bg-emerald-700 text-white rounded-lg text-xs font-semibold inline-flex items-center justify-center gap-1.5 transition-colors shadow-2xs shrink-0 whitespace-nowrap"
+              title="Générer et télécharger l'inventaire complet du parc en PDF"
+            >
             <Printer className="w-3.5 h-3.5 text-emerald-200" />
             <span>État Parc (PDF)</span>
           </button>
@@ -224,7 +351,6 @@ export const EquipmentsView: React.FC = () => {
             <span>+ Nouvel Équipement</span>
           </button>
         </div>
-      </div>
 
       {/* KPI Cards */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-6 gap-3">
@@ -662,6 +788,8 @@ export const EquipmentsView: React.FC = () => {
           </div>
         </div>
       )}
+    </div>
+  )}
 
       {/* Create / Edit Modal */}
       <EquipmentModal

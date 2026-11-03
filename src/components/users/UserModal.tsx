@@ -2,7 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AppUser, UserRole, UserPermissions } from '../../types';
 import { defaultPermissionsByRole, getRoleBadgeInfo } from '../../data/initialUsers';
-import { User, ShieldCheck, X, Check, Key, Lock, Phone, Mail } from 'lucide-react';
+import { User, ShieldCheck, X, Check, Key, Lock, Phone, Mail, Eye, EyeOff } from 'lucide-react';
 
 interface UserModalProps {
   isOpen: boolean;
@@ -18,7 +18,10 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, userToEdi
   const [phone, setPhone] = useState('+243 ');
   const [role, setRole] = useState<UserRole>('CASHIER');
   const [pinCode, setPinCode] = useState('1234');
-  const [assignedRegister, setAssignedRegister] = useState('Caisse 1 - Showroom Gombe');
+  const [showPin, setShowPin] = useState(false);
+  const [reprintPassword, setReprintPassword] = useState('');
+  const [showReprintPassword, setShowReprintPassword] = useState(false);
+  const [assignedRegister, setAssignedRegister] = useState('Caisse Principale 1');
   const [isActive, setIsActive] = useState(true);
   const [permissions, setPermissions] = useState<UserPermissions>(defaultPermissionsByRole.CASHIER);
 
@@ -29,6 +32,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, userToEdi
       setPhone(userToEdit.phone);
       setRole(userToEdit.role);
       setPinCode(userToEdit.pinCode);
+      setReprintPassword(userToEdit.reprintPassword || '');
       setAssignedRegister(userToEdit.assignedRegister || '');
       setIsActive(userToEdit.isActive);
       setPermissions(userToEdit.permissions || defaultPermissionsByRole[userToEdit.role]);
@@ -38,6 +42,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, userToEdi
       setPhone('+243 ');
       setRole('CASHIER');
       setPinCode(Math.floor(1000 + Math.random() * 9000).toString());
+      setReprintPassword('1234');
       setAssignedRegister('Caisse Showroom');
       setIsActive(true);
       setPermissions(defaultPermissionsByRole.CASHIER);
@@ -69,6 +74,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, userToEdi
         phone,
         role,
         pinCode,
+        reprintPassword: reprintPassword.trim() || undefined,
         assignedRegister,
         isActive,
         permissions,
@@ -80,6 +86,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, userToEdi
         phone,
         role,
         pinCode,
+        reprintPassword: reprintPassword.trim() || undefined,
         assignedRegister,
         isActive,
         permissions,
@@ -99,6 +106,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, userToEdi
 
   const permissionLabels: { key: keyof UserPermissions; label: string; desc: string }[] = [
     { key: 'canAccessPOS', label: 'Accéder à la Caisse Express (POS)', desc: 'Effectuer des ventes rapides, encaisser et imprimer tickets' },
+    { key: 'canReprintInvoices', label: 'Autoriser Réimpression Factures & Tickets POS', desc: 'Permet d\'autoriser la réimpression de tickets de caisse avec son mot de passe' },
     { key: 'canCreateInvoices', label: 'Créer Factures & Devis Proforma', desc: 'Émettre des documents commerciaux' },
     { key: 'canDeleteInvoices', label: 'Supprimer / Annuler des Factures', desc: 'Autorisation critique avec réajustement de stock' },
     { key: 'canManageClients', label: 'Gérer les Clients & Créances', desc: 'Créer clients, relancer par WhatsApp et enregistrer règlements' },
@@ -210,25 +218,61 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, userToEdi
             </div>
           </div>
 
-          {/* PIN Code & Assigned Register */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          {/* PIN Code & Reprint Password & Assigned Register */}
+          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1">
-                Code PIN Rapide (4 Chiffres) *
+                Code PIN Rapide (Bascule de session) *
               </label>
               <div className="relative">
                 <input
-                  type="text"
+                  type={showPin ? 'text' : 'password'}
                   maxLength={6}
                   value={pinCode}
                   onChange={(e) => setPinCode(e.target.value)}
-                  placeholder="1234"
-                  className="w-full pl-8 pr-3 py-2 bg-neutral-50 border border-neutral-300 rounded-lg font-mono-nums font-bold text-base text-neutral-900 focus:outline-none focus:bg-white"
+                  placeholder="••••"
+                  className="w-full pl-8 pr-9 py-2 bg-neutral-50 border border-neutral-300 rounded-lg font-mono-nums font-bold text-base text-neutral-900 focus:outline-none focus:bg-white"
                   required
                 />
                 <Key className="w-4 h-4 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <button
+                  type="button"
+                  onClick={() => setShowPin(!showPin)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700"
+                  title={showPin ? 'Masquer le code PIN' : 'Afficher le code PIN'}
+                >
+                  {showPin ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
               </div>
               <span className="text-[10px] text-neutral-500 mt-0.5 block">Permet l'accès rapide sur écran tactile</span>
+            </div>
+
+            <div>
+              <label className="block text-xs font-semibold text-amber-900 uppercase tracking-wider mb-1 flex items-center gap-1.5">
+                <Lock className="w-3.5 h-3.5 text-amber-600" />
+                <span>Mot de Passe Réimpression Facture (POS)</span>
+              </label>
+              <div className="relative">
+                <input
+                  type={showReprintPassword ? 'text' : 'password'}
+                  value={reprintPassword}
+                  onChange={(e) => setReprintPassword(e.target.value)}
+                  placeholder="Ex: 1234 ou Superviseur2026"
+                  className="w-full pl-8 pr-9 py-2 bg-amber-50/40 border border-amber-300 rounded-lg font-mono font-bold text-sm text-neutral-900 focus:outline-none focus:bg-white focus:border-amber-500"
+                />
+                <Lock className="w-4 h-4 text-amber-500 absolute left-2.5 top-1/2 -translate-y-1/2" />
+                <button
+                  type="button"
+                  onClick={() => setShowReprintPassword(!showReprintPassword)}
+                  className="absolute right-2.5 top-1/2 -translate-y-1/2 text-neutral-400 hover:text-neutral-700"
+                  title={showReprintPassword ? 'Masquer le mot de passe' : 'Afficher le mot de passe'}
+                >
+                  {showReprintPassword ? <EyeOff className="w-4 h-4" /> : <Eye className="w-4 h-4" />}
+                </button>
+              </div>
+              <span className="text-[10px] text-amber-700 mt-0.5 block font-medium">
+                Exigé à la caisse POS pour autoriser la réimpression d'une facture/ticket
+              </span>
             </div>
 
             <div>
@@ -251,7 +295,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, userToEdi
               <button
                 type="button"
                 onClick={() => setIsActive(!isActive)}
-                className={`w-full py-2.5 px-3 rounded-lg border font-semibold text-xs flex items-center justify-center gap-2 transition-colors ${
+                className={`w-full py-2 px-3 rounded-lg border font-semibold text-xs flex items-center justify-center gap-2 transition-colors ${
                   isActive
                     ? 'bg-emerald-50 border-emerald-300 text-emerald-800'
                     : 'bg-rose-50 border-rose-300 text-rose-800'

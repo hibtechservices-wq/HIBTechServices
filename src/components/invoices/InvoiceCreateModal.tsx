@@ -57,6 +57,10 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
   // Selected client update handler
   const handleClientChange = (id: string) => {
     setClientId(id);
+    if (id === 'comptoir') {
+      setClientNif('NON-ASSUJETTI');
+      return;
+    }
     const cl = clients.find(c => c.id === id);
     if (cl) {
       setClientNif(cl.nif || cl.rccmOrNif || '');
@@ -107,14 +111,14 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
   };
 
   const handleQuantityChange = (index: number, qty: number) => {
-    if (qty < 1) qty = 1;
+    const validQty = Math.max(0, qty);
     setItems(prev => {
       const copy = [...prev];
       const item = copy[index];
-      const sub = qty * item.unitPriceUSD;
+      const sub = validQty * item.unitPriceUSD;
       copy[index] = {
         ...item,
-        quantity: qty,
+        quantity: validQty,
         subtotalUSD: sub,
         taxAmountUSD: (sub * item.taxRate) / 100,
       };
@@ -184,13 +188,25 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
 
   const handleSubmit = (e: React.FormEvent) => {
     e.preventDefault();
-    if (!items.length || totalUSD <= 0) return;
+    if (!items.length) return;
+
+    // Sanitize any empty or zero quantity to 1
+    const finalItems = items.map(it => {
+      const q = it.quantity && it.quantity > 0 ? it.quantity : 1;
+      const sub = q * it.unitPriceUSD;
+      return {
+        ...it,
+        quantity: q,
+        subtotalUSD: sub,
+        taxAmountUSD: (sub * it.taxRate) / 100,
+      };
+    });
 
     const newSale = createSale({
       type: docType,
       clientId,
       clientNif: clientNif.trim() || undefined,
-      items,
+      items: finalItems,
       discountUSD,
       taxPercent,
       amountPaidUSD: docType === 'QUOTE_PROFORMA' ? 0 : amountPaidUSD,
@@ -289,8 +305,8 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
                 value={clientId}
                 onChange={(e) => handleClientChange(e.target.value)}
                 className="w-full bg-white border border-neutral-300 rounded-lg px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 font-medium"
-                required
               >
+                <option value="comptoir">Client Comptoir (Consommateur Final)</option>
                 {clients.map((c) => (
                   <option key={c.id} value={c.id}>
                     {c.name} {c.companyName ? `(${c.companyName})` : ''} — [{c.city}]
@@ -330,13 +346,13 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
               </button>
             </div>
 
-            <div className="border border-neutral-200 rounded-lg overflow-hidden">
-              <table className="w-full text-left text-xs border-collapse">
+            <div className="border border-neutral-200 rounded-lg overflow-x-auto">
+              <table className="w-full text-left text-xs border-collapse min-w-[560px]">
                 <thead className="bg-neutral-100 text-neutral-700 uppercase font-semibold text-[10px] border-b border-neutral-200">
                   <tr>
                     <th className="py-2.5 px-3">Article / Prestation</th>
                     <th className="py-2.5 px-2 text-center w-28">Gr. TVA DGI</th>
-                    <th className="py-2.5 px-3 text-right w-16">Qté</th>
+                    <th className="py-2.5 px-2 text-center w-32">Qté</th>
                     <th className="py-2.5 px-3 text-right w-24">Prix HT ($)</th>
                     <th className="py-2.5 px-3 text-right w-24">Total HT ($)</th>
                     <th className="py-2.5 px-2 text-center w-8"></th>
@@ -375,14 +391,49 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
                       </td>
 
                       {/* Quantity */}
-                      <td className="p-2 text-right">
-                        <input
-                          type="number"
-                          min="1"
-                          value={row.quantity}
-                          onChange={(e) => handleQuantityChange(idx, Number(e.target.value))}
-                          className="w-16 text-right font-mono-nums bg-neutral-50 border border-neutral-300 rounded px-2 py-1.5 text-xs focus:outline-none focus:bg-white"
-                        />
+                      <td className="p-2 text-center">
+                        <div className="flex items-center justify-center gap-1">
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(idx, Math.max(1, (row.quantity || 1) - 1))}
+                            className="w-6 h-6 flex items-center justify-center bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded text-xs transition-colors shrink-0"
+                            title="Diminuer la quantité (-1)"
+                          >
+                            -
+                          </button>
+                          <input
+                            type="number"
+                            min="0.01"
+                            step="any"
+                            value={row.quantity === 0 ? '' : row.quantity}
+                            onFocus={(e) => e.target.select()}
+                            onChange={(e) => {
+                              const val = e.target.value;
+                              if (val === '') {
+                                handleQuantityChange(idx, 0);
+                              } else {
+                                const num = parseFloat(val);
+                                handleQuantityChange(idx, isNaN(num) ? 0 : num);
+                              }
+                            }}
+                            onBlur={() => {
+                              if (!row.quantity || row.quantity <= 0) {
+                                handleQuantityChange(idx, 1);
+                              }
+                            }}
+                            className="w-14 text-center font-mono-nums font-bold bg-white border border-neutral-300 rounded px-1 py-1 text-xs focus:outline-none focus:border-neutral-900 shadow-2xs"
+                            placeholder="1"
+                            title="Saisir directement la quantité"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => handleQuantityChange(idx, (row.quantity || 1) + 1)}
+                            className="w-6 h-6 flex items-center justify-center bg-neutral-100 hover:bg-neutral-200 text-neutral-600 rounded text-xs transition-colors shrink-0"
+                            title="Augmenter la quantité (+1)"
+                          >
+                            +
+                          </button>
+                        </div>
                       </td>
 
                       {/* Unit Price */}
@@ -494,7 +545,7 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
                   rows={2}
                   value={notes}
                   onChange={(e) => setNotes(e.target.value)}
-                  placeholder="Ex: Garantie 12 mois, livraison à Gombe..."
+                  placeholder="Ex: Garantie 12 mois, livraison sur site..."
                   className="w-full bg-neutral-50 border border-neutral-300 rounded-lg p-2 text-xs text-neutral-900 focus:outline-none focus:bg-white"
                 />
               </div>

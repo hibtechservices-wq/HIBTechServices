@@ -1,7 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { ProductOrService, ItemType, FiscalTaxGroup } from '../../types';
-import { Package, Wrench, X, Check, DollarSign, ShieldCheck } from 'lucide-react';
+import { Package, Wrench, X, Check, DollarSign, ShieldCheck, Camera, Upload, Trash2, Image as ImageIcon } from 'lucide-react';
 
 interface ItemModalProps {
   isOpen: boolean;
@@ -27,10 +27,13 @@ export const ItemModal: React.FC<ItemModalProps> = ({
   const [description, setDescription] = useState('');
   const [unit, setUnit] = useState('Pièce');
   const [priceUSD, setPriceUSD] = useState<number>(0);
+  const [priceSemiWholesaleUSD, setPriceSemiWholesaleUSD] = useState<number | undefined>(undefined);
+  const [priceWholesaleUSD, setPriceWholesaleUSD] = useState<number | undefined>(undefined);
   const [costPriceUSD, setCostPriceUSD] = useState<number>(0);
   const [stockQty, setStockQty] = useState<number>(10);
   const [minStockAlert, setMinStockAlert] = useState<number>(3);
   const [taxGroup, setTaxGroup] = useState<FiscalTaxGroup>('A');
+  const [imageUrl, setImageUrl] = useState<string>('');
 
   useEffect(() => {
     if (itemToEdit) {
@@ -42,25 +45,45 @@ export const ItemModal: React.FC<ItemModalProps> = ({
       setDescription(itemToEdit.description || '');
       setUnit(itemToEdit.unit);
       setPriceUSD(itemToEdit.priceUSD);
+      setPriceSemiWholesaleUSD(itemToEdit.priceSemiWholesaleUSD);
+      setPriceWholesaleUSD(itemToEdit.priceWholesaleUSD);
       setCostPriceUSD(itemToEdit.costPriceUSD);
       setStockQty(itemToEdit.stockQty);
       setMinStockAlert(itemToEdit.minStockAlert);
       setTaxGroup(itemToEdit.taxGroup || 'A');
+      setImageUrl(itemToEdit.imageUrl || '');
     } else {
       setType(defaultType);
       setName('');
       setCode(`ART-${Date.now().toString().slice(-4)}`);
       setBarcode('');
-      setCategory(defaultType === 'PRODUCT' ? 'Informatique & Électronique' : 'Support & Maintenance');
+      setCategory(defaultType === 'PRODUCT' ? 'Informatique & Ordinateurs' : 'Support & Maintenance');
       setDescription('');
       setUnit(defaultType === 'PRODUCT' ? 'Pièce' : 'Forfait');
       setPriceUSD(50);
+      setPriceSemiWholesaleUSD(45);
+      setPriceWholesaleUSD(40);
       setCostPriceUSD(35);
       setStockQty(10);
       setMinStockAlert(3);
       setTaxGroup('A');
+      setImageUrl('');
     }
   }, [itemToEdit, defaultType, isOpen]);
+
+  const handleImageFileChange = (file?: File) => {
+    if (!file) return;
+    if (file.size > 4 * 1024 * 1024) {
+      alert("L'image est trop volumineuse (maximum 4 Mo).");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = (e) => {
+      const dataUrl = e.target?.result as string;
+      if (dataUrl) setImageUrl(dataUrl);
+    };
+    reader.readAsDataURL(file);
+  };
 
   if (!isOpen) return null;
 
@@ -78,10 +101,13 @@ export const ItemModal: React.FC<ItemModalProps> = ({
         description: description.trim() || undefined,
         unit,
         priceUSD,
+        priceSemiWholesaleUSD: priceSemiWholesaleUSD !== undefined ? Number(priceSemiWholesaleUSD) : undefined,
+        priceWholesaleUSD: priceWholesaleUSD !== undefined ? Number(priceWholesaleUSD) : undefined,
         costPriceUSD,
         stockQty: type === 'PRODUCT' ? stockQty : 0,
         minStockAlert: type === 'PRODUCT' ? minStockAlert : 0,
         taxGroup,
+        imageUrl: imageUrl.trim() || undefined,
       });
     } else {
       addProductOrService({
@@ -93,10 +119,13 @@ export const ItemModal: React.FC<ItemModalProps> = ({
         description: description.trim() || undefined,
         unit,
         priceUSD,
+        priceSemiWholesaleUSD: priceSemiWholesaleUSD !== undefined ? Number(priceSemiWholesaleUSD) : undefined,
+        priceWholesaleUSD: priceWholesaleUSD !== undefined ? Number(priceWholesaleUSD) : undefined,
         costPriceUSD,
         stockQty: type === 'PRODUCT' ? stockQty : 0,
         minStockAlert: type === 'PRODUCT' ? minStockAlert : 0,
         taxGroup,
+        imageUrl: imageUrl.trim() || undefined,
         isActive: true,
       });
     }
@@ -339,8 +368,58 @@ export const ItemModal: React.FC<ItemModalProps> = ({
                   <DollarSign className="w-4 h-4 text-neutral-400 absolute left-2.5 top-1/2 -translate-y-1/2" />
                 </div>
                 <span className="text-[11px] font-mono-nums text-emerald-700 font-medium mt-1 block">
-                  Marge brute : +${marginUSD.toFixed(2)} ({marginPercent}%)
+                  Marge brute détail : +${marginUSD.toFixed(2)} ({marginPercent}%)
                 </span>
+              </div>
+            </div>
+
+            {/* Grilles Tarifaires Additionnelles (Demi-Gros & Grossiste) */}
+            <div className="pt-2 border-t border-neutral-200">
+              <label className="block text-[11px] font-bold text-neutral-800 uppercase tracking-wider mb-2">
+                Grilles Tarifaires Multiples (Optionnel)
+              </label>
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-[10px] font-semibold text-neutral-600 uppercase mb-1">
+                    Prix Demi-Gros ($ USD)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={priceSemiWholesaleUSD ?? ''}
+                      placeholder={priceUSD ? `${(priceUSD * 0.9).toFixed(1)}` : '0'}
+                      onChange={(e) => setPriceSemiWholesaleUSD(e.target.value ? Number(e.target.value) : undefined)}
+                      className="w-full font-mono-nums font-semibold bg-white border border-neutral-300 rounded-lg pl-7 pr-3 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900"
+                    />
+                    <DollarSign className="w-3.5 h-3.5 text-neutral-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <span className="text-[10px] text-neutral-500 mt-0.5 block">
+                    Clients réguliers ou achats par volume
+                  </span>
+                </div>
+
+                <div>
+                  <label className="block text-[10px] font-semibold text-neutral-600 uppercase mb-1">
+                    Prix Grossiste ($ USD)
+                  </label>
+                  <div className="relative">
+                    <input
+                      type="number"
+                      min="0"
+                      step="0.5"
+                      value={priceWholesaleUSD ?? ''}
+                      placeholder={priceUSD ? `${(priceUSD * 0.8).toFixed(1)}` : '0'}
+                      onChange={(e) => setPriceWholesaleUSD(e.target.value ? Number(e.target.value) : undefined)}
+                      className="w-full font-mono-nums font-semibold bg-white border border-neutral-300 rounded-lg pl-7 pr-3 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900"
+                    />
+                    <DollarSign className="w-3.5 h-3.5 text-neutral-400 absolute left-2 top-1/2 -translate-y-1/2" />
+                  </div>
+                  <span className="text-[10px] text-neutral-500 mt-0.5 block">
+                    Revendeurs, entreprises sous contrat SLA
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -376,6 +455,77 @@ export const ItemModal: React.FC<ItemModalProps> = ({
               </div>
             </div>
           )}
+
+          {/* Photo du Produit / Service (Pour Espace Client B2B & Catalogue) */}
+          <div className="p-3.5 bg-neutral-50/80 rounded-xl border border-neutral-200 space-y-2.5">
+            <div className="flex items-center justify-between">
+              <label className="block text-xs font-semibold text-neutral-800 uppercase tracking-wider flex items-center gap-1.5">
+                <Camera className="w-4 h-4 text-emerald-600" />
+                <span>Photo du Produit (Affichée dans l'Espace Client & POS)</span>
+              </label>
+              {imageUrl && (
+                <button
+                  type="button"
+                  onClick={() => setImageUrl('')}
+                  className="text-rose-600 hover:text-rose-700 text-xs font-semibold flex items-center gap-1 cursor-pointer"
+                >
+                  <Trash2 className="w-3.5 h-3.5" />
+                  <span>Supprimer la photo</span>
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-4 gap-3 items-center">
+              {/* Preview Thumbnail */}
+              <div className="sm:col-span-1 h-24 rounded-lg border-2 border-dashed border-neutral-300 bg-white flex items-center justify-center overflow-hidden relative group">
+                {imageUrl ? (
+                  <img
+                    src={imageUrl}
+                    alt="Aperçu du produit"
+                    className="w-full h-full object-cover object-center"
+                    onError={(e) => {
+                      (e.target as HTMLElement).style.opacity = '0.3';
+                    }}
+                  />
+                ) : (
+                  <div className="text-neutral-400 flex flex-col items-center gap-1">
+                    <ImageIcon className="w-6 h-6 stroke-1 text-neutral-300" />
+                    <span className="text-[10px] text-neutral-400 font-medium">Aucune photo</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Upload controls */}
+              <div className="sm:col-span-3 space-y-2">
+                <div className="flex items-center gap-2">
+                  <label className="h-8 px-3 bg-neutral-900 hover:bg-neutral-800 text-white rounded-lg text-xs font-semibold inline-flex items-center gap-1.5 cursor-pointer transition-colors shadow-2xs">
+                    <Upload className="w-3.5 h-3.5 text-amber-400" />
+                    <span>Choisir une photo locale (PNG/JPG)</span>
+                    <input
+                      type="file"
+                      accept="image/*"
+                      className="hidden"
+                      onChange={(e) => handleImageFileChange(e.target.files?.[0])}
+                    />
+                  </label>
+                  <span className="text-[10px] text-neutral-400 font-medium">Max 4 Mo</span>
+                </div>
+
+                <div className="flex items-center gap-1.5">
+                  <input
+                    type="url"
+                    value={imageUrl.startsWith('data:') ? '' : imageUrl}
+                    onChange={(e) => setImageUrl(e.target.value)}
+                    placeholder="Ou collez un lien d'image web (https://...)"
+                    className="flex-1 bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 placeholder:text-neutral-400"
+                  />
+                </div>
+                <p className="text-[10px] text-neutral-500">
+                  Cette image sera visible par vos clients sur le <strong>Portail Client B2B</strong> et lors de leurs demandes de devis proforma en ligne.
+                </p>
+              </div>
+            </div>
+          </div>
 
           {/* Description */}
           <div>

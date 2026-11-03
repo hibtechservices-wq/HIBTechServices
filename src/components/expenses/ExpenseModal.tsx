@@ -111,7 +111,7 @@ export const ExpenseModal: React.FC<ExpenseModalProps> = ({ isOpen, onClose }) =
               type="text"
               value={description}
               onChange={(e) => setDescription(e.target.value)}
-              placeholder="Ex: 50L Mazout station Total Gombe pour groupe"
+              placeholder="Ex: 50L Mazout station TotalEnergies pour groupe"
               className="w-full bg-neutral-50 border border-neutral-300 rounded-lg px-3 py-2 text-neutral-900 focus:outline-none focus:border-neutral-900 focus:bg-white"
               required
             />

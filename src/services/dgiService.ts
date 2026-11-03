@@ -57,7 +57,7 @@ export async function testDgiGatewayConnection(
     message: `Connexion réussie à la passerelle DEF DGI (${config.environment === 'PRODUCTION' ? 'Serveur Central Production DGI RDC' : 'Serveur Bac à Sable Homologation'}). Jeton d'authentification valide.`,
     serverTimestamp: new Date().toISOString(),
     latencyMs,
-    dgiServerVersion: 'DGI-DEF-GW-v2.4.1 (Kinshasa / Gombe Central)',
+    dgiServerVersion: 'DGI-DEF-GW-v2.4.1 (Serveur National DEF)',
     gatewayStatus: 'ONLINE',
     repertoireCheck: {
       nif: company.nif || 'A2109845B',

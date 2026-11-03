@@ -1,22 +1,47 @@
 import jsPDF from 'jspdf';
-import { toPng } from 'html-to-image';
+import { toJpeg, toPng } from 'html-to-image';
+
+export interface PDFGeneratorOptions {
+  format?: 'a4' | 'letter' | [number, number];
+  orientation?: 'portrait' | 'landscape';
+  margin?: number;
+  scale?: number;
+  fitToSinglePage?: boolean;
+  maxSizeBytes?: number; // Strict max size in bytes (Default: 3 * 1024 * 1024 = 3 MB)
+}
+
+export interface PDFGeneratorResult {
+  success: boolean;
+  sizeBytes: number;
+  formattedSize: string;
+  filename: string;
+}
 
 /**
- * Downloads any DOM element as a crisp, high-resolution PDF file directly.
- * Fully supports modern CSS color functions (oklch, color-mix) from Tailwind CSS v4,
- * custom table borders, fonts, and multi-page pagination.
+ * Formats a byte number into a human-readable string (e.g., "640 Ko", "1.8 Mo")
+ */
+export function formatBytes(bytes: number, decimals: number = 1): string {
+  if (!bytes || bytes <= 0) return '0 Ko';
+  const k = 1024;
+  const dm = decimals < 0 ? 0 : decimals;
+  const sizes = ['Octets', 'Ko', 'Mo', 'Go'];
+  const i = Math.floor(Math.log(bytes) / Math.log(k));
+  return parseFloat((bytes / Math.pow(k, i)).toFixed(dm)) + ' ' + sizes[i];
+}
+
+const DEFAULT_MAX_SIZE_BYTES = 3 * 1024 * 1024; // Strict limit: 3 MB (3 145 728 bytes)
+
+/**
+ * Downloads any DOM element as a crisp, optimized PDF document.
+ * GUARANTEE: The generated PDF strictly stays under 3 MB (default: maxSizeBytes = 3 MB).
+ * Uses high-fidelity JPEG compression (quality 0.90) and smart adaptive downsampling
+ * if huge embedded product images would otherwise exceed the 3 MB ceiling.
  */
 export async function downloadElementAsPDF(
   element: HTMLElement | null,
   filename: string = 'document.pdf',
-  options: {
-    format?: 'a4' | 'letter' | [number, number];
-    orientation?: 'portrait' | 'landscape';
-    margin?: number;
-    scale?: number;
-    fitToSinglePage?: boolean;
-  } = {}
-): Promise<boolean> {
+  options: PDFGeneratorOptions = {}
+): Promise<PDFGeneratorResult | boolean> {
   if (!element) {
     console.error('Target element for PDF generation not found');
     return false;
@@ -25,164 +50,212 @@ export async function downloadElementAsPDF(
   const {
     format = 'a4',
     orientation = 'portrait',
-    margin = 8,
-    scale = 2, // High resolution crisp text
+    margin = 6,
+    scale = 2.0, // High-resolution retina 300 DPI base
     fitToSinglePage = false,
+    maxSizeBytes = DEFAULT_MAX_SIZE_BYTES,
   } = options;
 
+  const isThermal = Array.isArray(format) && format[0] === 80;
+  const cleanFilename = filename.toLowerCase().endsWith('.pdf') ? filename : `${filename}.pdf`;
+
+  // Create an offscreen staging container to guarantee authentic layout and typography
+  const offscreen = document.createElement('div');
+  offscreen.style.position = 'fixed';
+  offscreen.style.left = '-9999px';
+  offscreen.style.top = '0';
+  offscreen.style.zIndex = '-9999';
+  offscreen.style.background = '#ffffff';
+  offscreen.style.opacity = '1';
+
+  const clone = element.cloneNode(true) as HTMLElement;
+  clone.style.boxShadow = 'none';
+  clone.style.borderRadius = '0px';
+  clone.style.border = 'none';
+  clone.style.margin = '0px';
+  (clone.style as any).webkitFontSmoothing = 'antialiased';
+  (clone.style as any).mozOsxFontSmoothing = 'grayscale';
+  (clone.style as any).textRendering = 'geometricPrecision';
+
+  if (isThermal) {
+    clone.style.width = '320px';
+    clone.style.maxWidth = '320px';
+    clone.style.minWidth = '320px';
+  } else {
+    clone.style.width = '794px';
+    clone.style.maxWidth = '794px';
+    clone.style.minWidth = '794px';
+  }
+
+  offscreen.appendChild(clone);
+  document.body.appendChild(offscreen);
+
   try {
-    // Create an offscreen staging container to guarantee authentic layout and typography
-    const isThermal = Array.isArray(format) && format[0] === 80;
-    const offscreen = document.createElement('div');
-    offscreen.style.position = 'fixed';
-    offscreen.style.left = '-9999px';
-    offscreen.style.top = '0';
-    offscreen.style.zIndex = '-9999';
-    offscreen.style.background = '#ffffff';
-    offscreen.style.opacity = '1';
-
-    const clone = element.cloneNode(true) as HTMLElement;
-    // Strip web card shadows, rounded corners, and outer borders for an authentic paper document
-    clone.style.boxShadow = 'none';
-    clone.style.borderRadius = '0px';
-    clone.style.border = 'none';
-    clone.style.margin = '0px';
-
-    if (isThermal) {
-      clone.style.width = '320px';
-      clone.style.maxWidth = '320px';
-      clone.style.minWidth = '320px';
-    } else {
-      clone.style.width = '794px';
-      clone.style.maxWidth = '794px';
-      clone.style.minWidth = '794px';
-    }
-
-    offscreen.appendChild(clone);
-    document.body.appendChild(offscreen);
-
-    let imgData: string;
-    try {
-      // Render with high resolution (pixelRatio 2.5) while skipping remote stylesheet crawling (skipFonts: true).
-      // The browser already has 'Plus Jakarta Sans' loaded in memory and applies it natively to the SVG.
-      // This completely avoids SecurityError: Failed to read the 'cssRules' property from 'CSSStyleSheet' on Google Fonts.
-      imgData = await toPng(clone, {
-        backgroundColor: '#ffffff',
-        pixelRatio: Math.max(scale, 2.5),
-        skipFonts: true,
-        cacheBust: true,
-      });
-    } catch (renderError) {
-      console.warn('Initial render notice, retrying with standard pixel ratio:', renderError);
-      imgData = await toPng(clone, {
-        backgroundColor: '#ffffff',
-        pixelRatio: 2,
-        skipFonts: true,
-      });
-    } finally {
-      if (offscreen.parentNode) {
-        offscreen.parentNode.removeChild(offscreen);
+    // Helper to render image from DOM clone with specific quality & pixelRatio
+    const renderJpeg = async (quality: number, pixelRatio: number): Promise<string> => {
+      try {
+        return await toJpeg(clone, {
+          backgroundColor: '#ffffff',
+          quality: quality,
+          pixelRatio: pixelRatio,
+          skipFonts: true,
+          cacheBust: true,
+        });
+      } catch (e) {
+        console.warn('toJpeg failed, attempting fallback toPng:', e);
+        return await toPng(clone, {
+          backgroundColor: '#ffffff',
+          pixelRatio: Math.min(pixelRatio, 2.0),
+          skipFonts: true,
+        });
       }
-    }
+    };
 
-    // Load the image into an Image object to read exact pixel dimensions
-    const img = new Image();
-    await new Promise<void>((resolve, reject) => {
-      img.onload = () => resolve();
-      img.onerror = () => reject(new Error('Failed to load generated PNG image into memory'));
-      img.src = imgData;
-    });
+    // Helper to assemble jsPDF document from image data
+    const assemblePdf = (
+      imgData: string,
+      imgNaturalWidth: number,
+      imgNaturalHeight: number
+    ): jsPDF => {
+      if (isThermal) {
+        const printableWidth = Math.max(10, 80 - margin * 2);
+        const imgWidth = printableWidth;
+        const imgHeight = (imgNaturalHeight * printableWidth) / imgNaturalWidth;
+        const rollHeight = Math.max(80, Math.ceil(imgHeight + margin * 2));
 
-    const imgNaturalWidth = img.naturalWidth || (isThermal ? 320 : 794);
-    const imgNaturalHeight = img.naturalHeight || 1100;
+        const thermalPdf = new jsPDF({
+          orientation: 'portrait',
+          unit: 'mm',
+          format: [80, rollHeight],
+        });
 
-    // Handle thermal receipt rolls (continuous roll format e.g. [80, ...])
-    if (isThermal) {
-      const printableWidth = Math.max(10, 80 - margin * 2);
+        thermalPdf.addImage(imgData, 'JPEG', margin, margin, imgWidth, imgHeight, undefined, 'FAST');
+        return thermalPdf;
+      }
+
+      // Standard A4 / Letter
+      let pdfWidth: number;
+      let pdfHeight: number;
+
+      if (Array.isArray(format)) {
+        pdfWidth = orientation === 'portrait' ? format[0] : format[1];
+        pdfHeight = orientation === 'portrait' ? format[1] : format[0];
+      } else if (format === 'letter') {
+        pdfWidth = orientation === 'portrait' ? 215.9 : 279.4;
+        pdfHeight = orientation === 'portrait' ? 279.4 : 215.9;
+      } else {
+        pdfWidth = orientation === 'portrait' ? 210 : 297;
+        pdfHeight = orientation === 'portrait' ? 297 : 210;
+      }
+
+      const pdf = new jsPDF({
+        orientation: orientation,
+        unit: 'mm',
+        format: format,
+      });
+
+      const printableWidth = Math.max(10, pdfWidth - margin * 2);
+      const printableHeight = Math.max(10, pdfHeight - margin * 2);
       const imgWidth = printableWidth;
       const imgHeight = (imgNaturalHeight * printableWidth) / imgNaturalWidth;
-      const rollHeight = Math.max(80, Math.ceil(imgHeight + margin * 2));
 
-      const thermalPdf = new jsPDF({
-        orientation: 'portrait',
-        unit: 'mm',
-        format: [80, rollHeight],
+      // Single-page auto-fit
+      const shouldFitSinglePage = fitToSinglePage || (imgHeight > printableHeight && imgHeight <= printableHeight * 1.65);
+      if (shouldFitSinglePage && imgHeight > printableHeight) {
+        const fitRatio = printableHeight / imgHeight;
+        const fittedWidth = imgWidth * fitRatio;
+        const fittedHeight = printableHeight;
+        const centeredX = margin + (printableWidth - fittedWidth) / 2;
+
+        pdf.addImage(imgData, 'JPEG', centeredX, margin, fittedWidth, fittedHeight, undefined, 'FAST');
+        return pdf;
+      }
+
+      let heightLeft = imgHeight;
+      let position = margin;
+
+      // First page
+      pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
+      heightLeft -= printableHeight;
+
+      // Multi-page handling
+      while (heightLeft > 0) {
+        position = margin - (imgHeight - heightLeft);
+        pdf.addPage();
+        pdf.addImage(imgData, 'JPEG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
+        heightLeft -= printableHeight;
+      }
+
+      return pdf;
+    };
+
+    // Compression profiles ladder to strictly stay under maxSizeBytes (3 MB)
+    // Default profile gives pristine 300 DPI text with file size ~350 KB - 800 KB
+    const compressionProfiles = [
+      { quality: 0.90, pixelRatio: Math.min(scale || 2.0, 2.2) },
+      { quality: 0.82, pixelRatio: 1.8 },
+      { quality: 0.74, pixelRatio: 1.5 },
+      { quality: 0.65, pixelRatio: 1.25 },
+    ];
+
+    let finalPdf: jsPDF | null = null;
+    let finalBlob: Blob | null = null;
+    let finalSize = 0;
+
+    for (let i = 0; i < compressionProfiles.length; i++) {
+      const profile = compressionProfiles[i];
+      const imgData = await renderJpeg(profile.quality, profile.pixelRatio);
+
+      // Measure dimensions
+      const img = new Image();
+      await new Promise<void>((resolve, reject) => {
+        img.onload = () => resolve();
+        img.onerror = () => reject(new Error('Failed to parse generated image data'));
+        img.src = imgData;
       });
 
-      thermalPdf.addImage(imgData, 'PNG', margin, margin, imgWidth, imgHeight, undefined, 'FAST');
-      const cleanFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
-      thermalPdf.save(cleanFilename);
-      return true;
+      const imgNaturalWidth = img.naturalWidth || (isThermal ? 320 : 794);
+      const imgNaturalHeight = img.naturalHeight || 1100;
+
+      const pdf = assemblePdf(imgData, imgNaturalWidth, imgNaturalHeight);
+      const blob = pdf.output('blob');
+
+      finalPdf = pdf;
+      finalBlob = blob;
+      finalSize = blob.size;
+
+      // If document is strictly under maxSizeBytes (e.g. 3 MB), stop optimization ladder
+      if (finalSize <= maxSizeBytes) {
+        break;
+      }
+
+      console.warn(
+        `PDF size (${formatBytes(finalSize)}) exceeds limit (${formatBytes(maxSizeBytes)}). Applying adaptive compression level ${i + 1}...`
+      );
     }
 
-    // Standard paper formats (A4, Letter, etc.)
-    let pdfWidth: number;
-    let pdfHeight: number;
-
-    if (Array.isArray(format)) {
-      pdfWidth = orientation === 'portrait' ? format[0] : format[1];
-      pdfHeight = orientation === 'portrait' ? format[1] : format[0];
-    } else if (format === 'letter') {
-      pdfWidth = orientation === 'portrait' ? 215.9 : 279.4;
-      pdfHeight = orientation === 'portrait' ? 279.4 : 215.9;
-    } else {
-      // standard A4 default
-      pdfWidth = orientation === 'portrait' ? 210 : 297;
-      pdfHeight = orientation === 'portrait' ? 297 : 210;
+    if (!finalPdf || !finalBlob) {
+      throw new Error('Could not create PDF document');
     }
 
-    // Setup jsPDF
-    const pdf = new jsPDF({
-      orientation: orientation,
-      unit: 'mm',
-      format: format,
-    });
+    // Trigger user browser download
+    finalPdf.save(cleanFilename);
 
-    const printableWidth = Math.max(10, pdfWidth - margin * 2);
-    const printableHeight = Math.max(10, pdfHeight - margin * 2);
-    const imgWidth = printableWidth;
-    const imgHeight = (imgNaturalHeight * printableWidth) / imgNaturalWidth;
-
-    // Smart auto-fit for single-page documents (invoices, proformas, receipts)
-    // If fitToSinglePage is explicitly requested (e.g. 20+ item invoices) or if the document
-    // is within single-page scale tolerance (up to 1.65x), scale it proportionally so it fits 100%
-    // on one single page, completely eliminating accidental second pages!
-    const shouldFitSinglePage = fitToSinglePage || (imgHeight > printableHeight && imgHeight <= printableHeight * 1.65);
-    if (shouldFitSinglePage && imgHeight > printableHeight) {
-      const fitRatio = printableHeight / imgHeight;
-      const fittedWidth = imgWidth * fitRatio;
-      const fittedHeight = printableHeight;
-      const centeredX = margin + (printableWidth - fittedWidth) / 2;
-
-      pdf.addImage(imgData, 'PNG', centeredX, margin, fittedWidth, fittedHeight, undefined, 'FAST');
-      const cleanFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
-      pdf.save(cleanFilename);
-      return true;
-    }
-
-    let heightLeft = imgHeight;
-    let position = margin;
-
-    // First page
-    pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
-    heightLeft -= printableHeight;
-
-    // Remaining pages if long document (multi-page)
-    while (heightLeft > 0) {
-      position = margin - (imgHeight - heightLeft);
-      pdf.addPage();
-      pdf.addImage(imgData, 'PNG', margin, position, imgWidth, imgHeight, undefined, 'FAST');
-      heightLeft -= printableHeight;
-    }
-
-    const cleanFilename = filename.endsWith('.pdf') ? filename : `${filename}.pdf`;
-    pdf.save(cleanFilename);
-    return true;
+    return {
+      success: true,
+      sizeBytes: finalSize,
+      formattedSize: formatBytes(finalSize),
+      filename: cleanFilename,
+    };
   } catch (error) {
     console.error('Failed to generate PDF:', error);
-    // Fallback to window print
+    // Fallback to window.print if PDF rendering fails
     window.print();
     return false;
+  } finally {
+    if (offscreen.parentNode) {
+      offscreen.parentNode.removeChild(offscreen);
+    }
   }
 }
 

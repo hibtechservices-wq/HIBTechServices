@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { useApp } from '../../context/AppContext';
 import { AppUser } from '../../types';
 import { getRoleBadgeInfo } from '../../data/initialUsers';
@@ -7,13 +7,11 @@ import {
   Unlock,
   KeyRound,
   ShieldCheck,
-  Building,
-  User,
-  CheckCircle2,
-  AlertCircle,
   Clock,
-  Sparkles,
-  Store,
+  Eye,
+  EyeOff,
+  Globe,
+  ArrowLeft,
 } from 'lucide-react';
 
 export const LockScreen: React.FC = () => {
@@ -22,12 +20,15 @@ export const LockScreen: React.FC = () => {
     currentUser,
     unlockSession,
     settings,
+    setActiveTab,
   } = useApp();
 
   const [selectedUser, setSelectedUser] = useState<AppUser>(currentUser);
   const [enteredPin, setEnteredPin] = useState('');
   const [errorMessage, setErrorMessage] = useState('');
+  const [showEnteredDigits, setShowEnteredDigits] = useState(false);
   const [currentTime, setCurrentTime] = useState(new Date());
+  const pinInputRef = useRef<HTMLInputElement>(null);
 
   // Live clock
   useEffect(() => {
@@ -44,6 +45,11 @@ export const LockScreen: React.FC = () => {
     }
   }, [currentUser]);
 
+  // Focus input automatically on mount
+  useEffect(() => {
+    pinInputRef.current?.focus();
+  }, [selectedUser]);
+
   // Physical keyboard support for fast PIN entry
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
@@ -58,6 +64,8 @@ export const LockScreen: React.FC = () => {
       } else if (e.key === 'Enter') {
         if (enteredPin.length >= 4) {
           submitPin(enteredPin);
+        } else {
+          setErrorMessage('Veuillez saisir votre code PIN à 4 chiffres.');
         }
       }
     };
@@ -67,7 +75,7 @@ export const LockScreen: React.FC = () => {
   }, [enteredPin, selectedUser]);
 
   const handleDigit = (digit: string) => {
-    if (enteredPin.length < 6) {
+    if (enteredPin.length < 4) {
       const nextPin = enteredPin + digit;
       setEnteredPin(nextPin);
       setErrorMessage('');
@@ -81,19 +89,22 @@ export const LockScreen: React.FC = () => {
   const submitPin = (pinToSubmit: string) => {
     const res = unlockSession(selectedUser, pinToSubmit);
     if (!res.success) {
-      setErrorMessage(res.message || 'Code PIN incorrect.');
+      setErrorMessage(res.message || 'Code PIN incorrect. Veuillez réessayer.');
       setEnteredPin('');
+      pinInputRef.current?.focus();
     } else {
       setEnteredPin('');
       setErrorMessage('');
     }
   };
 
-  const handleDirectDemoUnlock = (userToUnlock: AppUser) => {
-    const res = unlockSession(userToUnlock, userToUnlock.pinCode);
-    if (!res.success) {
-      setErrorMessage(res.message || 'Impossible de déverrouiller.');
+  const handleUnlockClick = () => {
+    if (enteredPin.length < 4) {
+      setErrorMessage('Veuillez saisir votre code PIN à 4 chiffres.');
+      pinInputRef.current?.focus();
+      return;
     }
+    submitPin(enteredPin);
   };
 
   const activeUsers = users.filter((u) => u.isActive);
@@ -125,8 +136,18 @@ export const LockScreen: React.FC = () => {
           </div>
         </div>
 
-        {/* Live Clock & Rate in DRC */}
-        <div className="flex items-center gap-4 text-xs font-mono-nums">
+        {/* Live Clock & Rate & Portal Button */}
+        <div className="flex items-center gap-2.5 sm:gap-4 text-xs font-mono-nums">
+          <button
+            type="button"
+            onClick={() => setActiveTab('portal')}
+            className="px-3 py-1.5 bg-emerald-600 hover:bg-emerald-500 text-white rounded-xl text-xs font-bold transition-all shadow-md flex items-center gap-1.5 cursor-pointer font-sans"
+            title="Accéder directement au Portail Client & Catalogue Public"
+          >
+            <Globe className="w-3.5 h-3.5" />
+            <span>Portail Client</span>
+          </button>
+
           <div className="hidden sm:flex items-center gap-2 px-3 py-1 bg-neutral-800/60 rounded-lg border border-neutral-700/60 text-neutral-300">
             <span className="text-amber-400 font-bold">1$ USD = {settings.exchangeRateUSD_CDF?.toLocaleString('fr-FR') || 2850} FC</span>
           </div>
@@ -149,14 +170,14 @@ export const LockScreen: React.FC = () => {
               <Lock className="w-7 h-7 text-amber-400" />
             </div>
             <h2 className="text-xl sm:text-2xl font-bold tracking-tight text-white">
-              Session Verrouillée
+              Connexion Sécurisée
             </h2>
             <p className="text-xs text-neutral-400 max-w-md mx-auto">
-              Sélectionnez votre profil opérateur et saisissez votre <strong>Code PIN à 4 chiffres</strong> pour déverrouiller la caisse et la gestion commerciale.
+              Sélectionnez votre profil opérateur et saisissez votre <strong>Code PIN secret à 4 chiffres</strong> pour accéder à l'application.
             </p>
           </div>
 
-          {/* User selector cards */}
+          {/* User selector cards - Passwords are NEVER displayed */}
           <div className="space-y-2">
             <span className="block text-[11px] font-semibold text-neutral-400 uppercase tracking-wider text-center">
               Choisir l'Opérateur / Caissier :
@@ -173,6 +194,7 @@ export const LockScreen: React.FC = () => {
                       setSelectedUser(user);
                       setEnteredPin('');
                       setErrorMessage('');
+                      pinInputRef.current?.focus();
                     }}
                     className={`p-3 rounded-2xl border text-left transition-all flex flex-col justify-between ${
                       isSelected
@@ -191,8 +213,9 @@ export const LockScreen: React.FC = () => {
                         {roleBadge.label.split('/')[0]}
                       </span>
                     </div>
-                    <span className="text-[9px] font-mono-nums text-neutral-500 mt-2 block">
-                      PIN: <span className="font-bold text-neutral-300">{user.pinCode}</span>
+                    <span className="text-[9px] text-neutral-500 mt-2 flex items-center gap-1 font-medium">
+                      <Lock className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
+                      <span>Code requis</span>
                     </span>
                   </button>
                 );
@@ -218,30 +241,82 @@ export const LockScreen: React.FC = () => {
 
             <button
               type="button"
-              onClick={() => handleDirectDemoUnlock(selectedUser)}
-              className="px-3 py-1.5 bg-amber-400 hover:bg-amber-300 text-neutral-950 rounded-lg text-xs font-bold transition-colors shrink-0 flex items-center gap-1.5 shadow-xs"
-              title="Connexion immédiate avec le code PIN démo de cet utilisateur"
+              onClick={handleUnlockClick}
+              className={`px-3.5 py-1.5 rounded-lg text-xs font-bold transition-all shrink-0 flex items-center gap-1.5 shadow-xs ${
+                enteredPin.length >= 4
+                  ? 'bg-amber-400 hover:bg-amber-300 text-neutral-950 cursor-pointer active:scale-95'
+                  : 'bg-neutral-800 hover:bg-neutral-700 text-neutral-300 border border-neutral-700 cursor-pointer'
+              }`}
+              title="Valider votre code PIN pour vous connecter"
             >
               <Unlock className="w-3.5 h-3.5" />
-              <span>Déverrouiller</span>
+              <span>Se connecter</span>
             </button>
           </div>
 
-          {/* PIN Display bullets */}
+          {/* Hidden/accessible input for touch virtual keyboards & autofocus */}
+          <input
+            ref={pinInputRef}
+            type={showEnteredDigits ? 'text' : 'password'}
+            inputMode="numeric"
+            pattern="[0-9]*"
+            maxLength={4}
+            value={enteredPin}
+            onChange={(e) => {
+              const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+              setEnteredPin(val);
+              setErrorMessage('');
+              if (val.length === 4) {
+                submitPin(val);
+              }
+            }}
+            className="sr-only"
+            autoComplete="current-password"
+            aria-label="Code PIN secret"
+          />
+
+          {/* PIN Display bullets (Clickable to focus) */}
           <div className="text-center space-y-3">
-            <div className="flex justify-center gap-3">
-              {[0, 1, 2, 3].map((idx) => (
-                <div
-                  key={idx}
-                  className={`w-11 h-11 rounded-xl border flex items-center justify-center font-mono-nums text-xl font-bold transition-all ${
-                    enteredPin.length > idx
-                      ? 'border-amber-400 bg-amber-400/20 text-amber-400 shadow-sm scale-105'
-                      : 'border-neutral-700 bg-neutral-800/60 text-neutral-500'
-                  }`}
+            <div
+              onClick={() => pinInputRef.current?.focus()}
+              className="flex justify-center items-center gap-3 cursor-pointer select-none"
+              title="Cliquez pour saisir au clavier ou utilisez le pavé tactile ci-dessous"
+            >
+              {[0, 1, 2, 3].map((idx) => {
+                const hasDigit = enteredPin.length > idx;
+                const digitChar = enteredPin[idx];
+                return (
+                  <div
+                    key={idx}
+                    className={`w-11 h-11 rounded-xl border flex items-center justify-center font-mono-nums text-xl font-bold transition-all ${
+                      hasDigit
+                        ? 'border-amber-400 bg-amber-400/20 text-amber-400 shadow-sm scale-105'
+                        : 'border-neutral-700 bg-neutral-800/60 text-neutral-500'
+                    }`}
+                  >
+                    {hasDigit ? (showEnteredDigits ? digitChar : '●') : ''}
+                  </div>
+                );
+              })}
+
+              {/* Show/Hide entered digits button */}
+              {enteredPin.length > 0 && (
+                <button
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowEnteredDigits((prev) => !prev);
+                  }}
+                  className="p-1.5 rounded-lg text-neutral-400 hover:text-white bg-neutral-800/60 hover:bg-neutral-800 transition-colors"
+                  title={showEnteredDigits ? 'Masquer la saisie' : 'Afficher la saisie'}
                 >
-                  {enteredPin.length > idx ? '●' : ''}
-                </div>
-              ))}
+                  {showEnteredDigits ? (
+                    <EyeOff className="w-4 h-4 text-amber-400" />
+                  ) : (
+                    <Eye className="w-4 h-4" />
+                  )}
+                </button>
+              )}
             </div>
 
             {errorMessage && (
@@ -261,9 +336,13 @@ export const LockScreen: React.FC = () => {
                   if (k === 'C') {
                     setEnteredPin('');
                     setErrorMessage('');
+                    pinInputRef.current?.focus();
                   } else if (k === 'OK') {
                     if (enteredPin.length >= 4) {
                       submitPin(enteredPin);
+                    } else {
+                      setErrorMessage('Veuillez saisir votre code PIN à 4 chiffres.');
+                      pinInputRef.current?.focus();
                     }
                   } else {
                     handleDigit(k);
@@ -280,6 +359,18 @@ export const LockScreen: React.FC = () => {
                 {k}
               </button>
             ))}
+          </div>
+
+          {/* Link to public customer portal */}
+          <div className="pt-2 text-center border-t border-neutral-800/80">
+            <button
+              type="button"
+              onClick={() => setActiveTab('portal')}
+              className="text-xs text-emerald-400 hover:text-emerald-300 font-semibold flex items-center justify-center gap-1.5 mx-auto transition-colors py-1 px-3 rounded-lg hover:bg-neutral-800"
+            >
+              <ArrowLeft className="w-3.5 h-3.5" />
+              <span>Vous êtes client ? Accéder au Portail Public (Catalogue & Devis)</span>
+            </button>
           </div>
         </div>
       </main>

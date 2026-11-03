@@ -11,25 +11,89 @@
   font-variant-numeric: tabular-nums;
 }
 
-/* Print optimizations for Factures & Reçus */
+/* Optimisations d'impression professionnelles haute définition */
 @media print {
-  body {
-    background-color: white !important;
-    color: black !important;
+  *, *::before, *::after {
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+    color-adjust: exact !important;
   }
-  .no-print {
+
+  /* Masquer tous les bandeaux, barres latérales et navigation pour isoler le document */
+  body > #root > div > header,
+  body > #root > div > main,
+  body > #root > div > div:not(.print-modal-overlay),
+  body > #root > div > nav,
+  aside,
+  main.no-print,
+  .no-print,
+  .no-print * {
     display: none !important;
   }
-  .print-only {
-    display: block !important;
-  }
-  .print-page {
-    box-shadow: none !important;
-    border: none !important;
+
+  html, body {
+    background: #ffffff !important;
+    color: #0f172a !important;
     margin: 0 !important;
     padding: 0 !important;
     width: 100% !important;
+    -webkit-font-smoothing: antialiased !important;
+    -moz-osx-font-smoothing: grayscale !important;
+    text-rendering: geometricPrecision !important;
+  }
+
+  .print-only {
+    display: block !important;
+  }
+
+  /* Reset des modales en mode impression physique pour isoler le document */
+  .print-modal-overlay {
+    position: static !important;
+    background: transparent !important;
+    backdrop-filter: none !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    inset: auto !important;
+    display: block !important;
+    z-index: auto !important;
+  }
+
+  .print-modal-card {
+    border: none !important;
+    box-shadow: none !important;
+    border-radius: 0 !important;
     max-width: 100% !important;
+    max-height: none !important;
+    height: auto !important;
+    overflow: visible !important;
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    width: 100% !important;
+  }
+
+  .print-preview-container {
+    background: transparent !important;
+    padding: 0 !important;
+    margin: 0 !important;
+    overflow: visible !important;
+    display: block !important;
+    width: 100% !important;
+  }
+
+  .print-page {
+    box-shadow: none !important;
+    border: none !important;
+    border-radius: 0px !important;
+    margin: 0 auto !important;
+    padding: 0 !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 0 !important;
+    page-break-inside: avoid !important;
+    break-inside: avoid !important;
+    background-color: #ffffff !important;
   }
 }
 

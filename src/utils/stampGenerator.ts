@@ -2,9 +2,9 @@
  * Helper to generate official corporate seal (cachet/tampon) and signature SVGs for documents.
  */
 
-export function generateDefaultStampSvg(companyName: string = 'CONGO TECH SARL', city: string = 'KINSHASA - RDC', nif: string = 'A2109845B'): string {
+export function generateDefaultStampSvg(companyName: string = 'CONGO TECH SARL', city: string = 'RÉP. DÉM. DU CONGO', nif: string = 'A2109845B'): string {
   const safeName = (companyName || 'CONGO TECH SARL').toUpperCase().slice(0, 32);
-  const safeCity = (city || 'KINSHASA - RDC').toUpperCase();
+  const safeCity = (city || 'RÉP. DÉM. DU CONGO').toUpperCase();
 
   const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 200 200" width="200" height="200">
   <defs>
@@ -54,3 +54,41 @@ export function generateDefaultSignatureSvg(signatoryName: string = 'La Directio
 
   return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
 }
+
+export function generateCashPaidStampSvg(companyName: string = 'CONGO TECH SARL', cashierName?: string): string {
+  const safeName = (companyName || 'CONGO TECH SARL').toUpperCase().slice(0, 32);
+  const safeCashier = cashierName ? cashierName.toUpperCase() : 'CAISSE CENTRALE';
+
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 320 150" width="320" height="150">
+  <!-- Outer double border with distressed red stamp ink appearance -->
+  <rect x="6" y="6" width="308" height="138" rx="10" fill="none" stroke="#dc2626" stroke-width="4.5" opacity="0.95" />
+  <rect x="15" y="15" width="290" height="120" rx="6" fill="none" stroke="#dc2626" stroke-width="2" stroke-dasharray="6 3" opacity="0.88" />
+  
+  <!-- Top company tag -->
+  <text x="160" y="36" font-family="'Plus Jakarta Sans', Arial, sans-serif" font-size="10.5" font-weight="900" fill="#dc2626" text-anchor="middle" letter-spacing="2">
+    ★ ${safeName} ★
+  </text>
+  
+  <line x1="28" y1="43" x2="292" y2="43" stroke="#dc2626" stroke-width="1.8" opacity="0.85" />
+  
+  <!-- Central Big PAYÉ CASH Headline -->
+  <g fill="#dc2626" text-anchor="middle" font-family="'Plus Jakarta Sans', Arial, sans-serif">
+    <text x="160" y="85" font-size="36" font-weight="900" letter-spacing="4" font-style="normal">
+      PAYÉ CASH
+    </text>
+    <text x="160" y="104" font-size="10.5" font-weight="800" letter-spacing="2">
+      BON POUR ACQUIT · EN ESPÈCES
+    </text>
+  </g>
+  
+  <line x1="28" y1="113" x2="292" y2="113" stroke="#dc2626" stroke-width="1.8" opacity="0.85" />
+  
+  <!-- Bottom footer -->
+  <text x="160" y="128" font-family="'Plus Jakarta Sans', Arial, sans-serif" font-size="9.5" font-weight="800" fill="#dc2626" text-anchor="middle" letter-spacing="1.5">
+    ${safeCashier} · RÈGLEMENT COMPTANT
+  </text>
+</svg>`;
+
+  return `data:image/svg+xml;utf8,${encodeURIComponent(svg)}`;
+}
+

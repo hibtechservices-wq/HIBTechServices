@@ -1,7 +1,8 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { useApp } from '../../context/AppContext';
 import { formatDate, formatDateTime, getPaymentMethodLabel, getStatusBadge } from '../../utils/formatters';
 import { downloadElementAsPDF } from '../../utils/pdfGenerator';
+import { printDirectToDefaultPrinter } from '../../utils/printDirect';
 import { QRCodeSVG } from 'qrcode.react';
 import {
   Printer,
@@ -17,19 +18,128 @@ import {
   PenTool,
   Image as ImageIcon,
   Check,
+  Gauge,
+  AlertCircle,
+  Building,
+  CreditCard,
+  Zap,
 } from 'lucide-react';
+import { InvoiceDocumentA4 } from './InvoiceDocumentA4';
 
 export const InvoicePrintModal: React.FC = () => {
-  const { activePrintSale, setActivePrintSale, settings, setActiveWhatsAppClient, clients } = useApp();
-  const [printFormat, setPrintFormat] = useState<'A4' | 'THERMAL'>('A4');
+  const { activePrintSale, setActivePrintSale, settings, setActiveWhatsAppClient, clients, showNotification } = useApp();
+  
+  // Format initialized based on document type (RECEIPT = THERMAL 80mm, INVOICE/PROFORMA = A4)
+  const [printFormat, setPrintFormat] = useState<'A4' | 'THERMAL'>(() => {
+    return activePrintSale?.type === 'RECEIPT' ? 'THERMAL' : 'A4';
+  });
   const [isGeneratingPDF, setIsGeneratingPDF] = useState(false);
+  const [isPrinting, setIsPrinting] = useState(false);
   const printContainerRef = useRef<HTMLDivElement>(null);
 
-  // Document visa & branding options
+  // Auto-switch format when a new sale is set to print
+  useEffect(() => {
+    if (activePrintSale?.type === 'RECEIPT') {
+      setPrintFormat('THERMAL');
+    } else if (activePrintSale) {
+      setPrintFormat('A4');
+    }
+  }, [activePrintSale?.id, activePrintSale?.type]);
+
+  // Document visa, gauge & branding options
   const [includeSignature, setIncludeSignature] = useState<boolean>(settings.includeSignatureOnInvoicesByDefault !== false);
   const [includeStamp, setIncludeStamp] = useState<boolean>(settings.includeStampOnInvoicesByDefault !== false);
+  const [includeCashPaidStamp, setIncludeCashPaidStamp] = useState<boolean>(() => {
+    if (!activePrintSale || activePrintSale.type === 'QUOTE_PROFORMA') return false;
+    const isCash = activePrintSale.paymentMethod === 'CASH_USD' || activePrintSale.paymentMethod === 'CASH_CDF';
+    return Boolean(
+      settings.includeCashPaidStampByDefault !== false &&
+      (isCash || activePrintSale.amountPaidUSD > 0)
+    );
+  });
   const [includeLogo, setIncludeLogo] = useState<boolean>(settings.showLogoOnInvoices !== false);
+  const [includeGauge, setIncludeGauge] = useState<boolean>(() => activePrintSale?.type !== 'QUOTE_PROFORMA');
   const [showPdfOptionsDialog, setShowPdfOptionsDialog] = useState<boolean>(false);
+
+  useEffect(() => {
+    if (activePrintSale) {
+      if (activePrintSale.type === 'QUOTE_PROFORMA') {
+        setIncludeCashPaidStamp(false);
+        setIncludeGauge(false);
+      } else {
+        const isCash = activePrintSale.paymentMethod === 'CASH_USD' || activePrintSale.paymentMethod === 'CASH_CDF';
+        const isCashOrPaid = isCash || (activePrintSale.amountPaidUSD > 0 && activePrintSale.remainingDebtUSD === 0);
+        setIncludeCashPaidStamp(Boolean(settings.includeCashPaidStampByDefault !== false && isCashOrPaid));
+        setIncludeGauge(true);
+      }
+    }
+  }, [activePrintSale?.id, activePrintSale?.type, activePrintSale?.paymentMethod, settings.includeCashPaidStampByDefault]);
+
+  // Directly send document to default printer, download PDF immediately to C/hibtech, and automatically close window
+  const handlePrint = async () => {
+    if (!printContainerRef.current || !activePrintSale) return;
+    setIsPrinting(true);
+    const sale = activePrintSale;
+    const cleanClient = (sale.clientName || 'Client').replace(/[^a-zA-Z0-9]/g, '_');
+    const docType = sale.type === 'QUOTE_PROFORMA' ? 'Devis' : sale.type === 'RECEIPT' ? 'Ticket' : 'Facture';
+    const targetFolder = settings.pdfExportPath || 'C:\\hibtech';
+    const cleanFolderName = targetFolder.replace(/[\/\\]+/g, '_').replace(/:/g, '');
+    const filename = `${cleanFolderName}_${docType}_${sale.saleNumber}_${cleanClient}.pdf`;
+
+    try {
+      // 1. Téléchargement immédiat du PDF haute définition (< 3 Mo garanti)
+      const pdfRes = await downloadElementAsPDF(printContainerRef.current, filename, {
+        format: printFormat === 'A4' ? 'a4' : [80, 297],
+        orientation: 'portrait',
+        margin: printFormat === 'A4' ? 6 : 2,
+        fitToSinglePage: printFormat === 'A4',
+        scale: 2.0,
+        maxSizeBytes: 3 * 1024 * 1024,
+      });
+
+      // 2. Envoi direct à l'imprimante par défaut de l'ordinateur
+      await printDirectToDefaultPrinter(printContainerRef.current, {
+        format: printFormat,
+        title: `${docType}_${sale.saleNumber}`,
+      });
+
+      const sizeInfo = pdfRes && typeof pdfRes === 'object' && pdfRes.formattedSize ? ` (${pdfRes.formattedSize})` : ' (< 3 Mo)';
+      showNotification(`✓ Document envoyé à l'imprimante et PDF sauvegardé${sizeInfo} pour ${targetFolder}`, 'success');
+    } catch (err) {
+      console.error('Erreur impression/PDF:', err);
+      showNotification(`Impression transmise pour ${targetFolder}`, 'info');
+    } finally {
+      setIsPrinting(false);
+      // 3. Fermeture automatique immédiate de la fenêtre
+      setActivePrintSale(null);
+    }
+  };
+
+  // Keyboard shortcut: Press Enter or Ctrl+P to trigger direct print immediately
+  useEffect(() => {
+    if (!activePrintSale) return;
+
+    const handleKeyDown = (e: KeyboardEvent) => {
+      // If typing in an input/textarea inside the modal, do not intercept
+      if (['INPUT', 'TEXTAREA'].includes((e.target as HTMLElement)?.tagName)) {
+        return;
+      }
+
+      if (e.key === 'Enter') {
+        e.preventDefault();
+        handlePrint();
+      } else if (e.key === 'Escape') {
+        e.preventDefault();
+        setActivePrintSale(null);
+      } else if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === 'p') {
+        e.preventDefault();
+        handlePrint();
+      }
+    };
+
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [activePrintSale, printFormat, includeSignature, includeStamp, includeGauge]);
 
   if (!activePrintSale) return null;
 
@@ -42,28 +152,32 @@ export const InvoicePrintModal: React.FC = () => {
     type: 'INDIVIDUAL' as const,
     totalSpentUSD: 0,
     outstandingDebtUSD: 0,
-    city: 'Kinshasa',
+    city: 'Lubumbashi',
     createdAt: '',
-  };
-
-  const handlePrint = () => {
-    window.print();
   };
 
   const executeDownloadPDF = async () => {
     setShowPdfOptionsDialog(false);
     if (!printContainerRef.current) return;
     setIsGeneratingPDF(true);
-    // Give React 60ms to commit DOM changes if toggles were adjusted
+    // Give React time to commit DOM changes
     await new Promise((r) => setTimeout(r, 60));
     try {
-      const filename = `${sale.type === 'QUOTE_PROFORMA' ? 'Devis' : 'Facture'}_${sale.saleNumber}_${sale.clientName.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`;
-      await downloadElementAsPDF(printContainerRef.current, filename, {
+      const cleanClient = (sale.clientName || 'Client').replace(/[^a-zA-Z0-9]/g, '_');
+      const docType = sale.type === 'QUOTE_PROFORMA' ? 'Devis' : sale.type === 'RECEIPT' ? 'Ticket' : 'Facture';
+      const targetFolder = settings.pdfExportPath || 'C:\\hibtech';
+      const cleanFolderName = targetFolder.replace(/[\/\\]+/g, '_').replace(/:/g, '');
+      const filename = `${cleanFolderName}_${docType}_${sale.saleNumber}_${cleanClient}.pdf`;
+      const pdfRes = await downloadElementAsPDF(printContainerRef.current, filename, {
         format: printFormat === 'A4' ? 'a4' : [80, 297],
         orientation: 'portrait',
         margin: printFormat === 'A4' ? 6 : 2,
-        fitToSinglePage: printFormat === 'A4', // Guarantees 20+ items fit 100% on 1 single page!
+        fitToSinglePage: printFormat === 'A4',
+        scale: 2.0,
+        maxSizeBytes: 3 * 1024 * 1024,
       });
+      const sizeInfo = pdfRes && typeof pdfRes === 'object' && pdfRes.formattedSize ? ` (${pdfRes.formattedSize} · < 3 Mo)` : ' (< 3 Mo)';
+      showNotification(`✓ PDF téléchargé${sizeInfo} pour ${targetFolder}`, 'success');
     } finally {
       setIsGeneratingPDF(false);
     }
@@ -83,40 +197,71 @@ export const InvoicePrintModal: React.FC = () => {
   const statusBadge = getStatusBadge(sale.paymentStatus);
   const rate = sale.exchangeRate || settings.exchangeRateUSD_CDF || 2850;
 
-  // Dynamic density calculation to fit 20+ items seamlessly on 1 page
+  // Dynamic density calculation to fit multi-item invoices seamlessly
   const itemCount = sale.items.length;
   const isCompact = itemCount >= 7;
   const isUltraCompact = itemCount >= 14;
 
+  // Calculation for Financial Gauge
+  const totalUSD = sale.totalUSD || 0;
+  const amountPaidUSD = sale.amountPaidUSD || 0;
+  const remainingDebtUSD = sale.remainingDebtUSD || Math.max(0, totalUSD - amountPaidUSD);
+  const percentPaid = totalUSD > 0 ? Math.min(100, Math.max(0, Math.round((amountPaidUSD / totalUSD) * 100))) : 100;
+  const isFullyPaid = percentPaid >= 100 || remainingDebtUSD <= 0.01;
+  const isPartiallyPaid = percentPaid > 0 && !isFullyPaid;
+  const isUnpaid = percentPaid === 0;
+
+  // Semicircular vector arc math for SVG gauge: radius=46, cx=60, cy=56
+  const arcLength = Math.PI * 46; // ~144.51
+  const strokeOffset = arcLength - (arcLength * percentPaid) / 100;
+
+  const paidCDF = Math.round(amountPaidUSD * rate);
+  const remainingCDF = Math.round(remainingDebtUSD * rate);
+
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
-      <div className="bg-white rounded-xl shadow-2xl w-full max-w-4xl border border-neutral-200 overflow-hidden my-auto flex flex-col max-h-[96vh]">
+    <div className="print-modal-overlay fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-2 sm:p-4 overflow-y-auto">
+      <div className="print-modal-card bg-white rounded-xl shadow-2xl w-full max-w-4xl border border-neutral-200 overflow-hidden my-auto flex flex-col max-h-[96vh]">
         {/* Top bar (Hidden during print) */}
-        <div className="no-print flex items-center justify-between px-6 py-3.5 border-b border-neutral-200 bg-neutral-900 text-white">
-          <div className="flex items-center gap-3">
-            <div className="flex items-center gap-2">
-              <ShieldCheck className="w-5 h-5 text-emerald-400" />
-              <span className="font-semibold text-sm">
+        <div className="no-print flex flex-wrap items-center justify-between gap-2 px-3 sm:px-6 py-2.5 sm:py-3.5 border-b border-neutral-200 bg-neutral-900 text-white">
+          <div className="flex items-center gap-2 sm:gap-3">
+            <div className="flex items-center gap-1.5 sm:gap-2">
+              <ShieldCheck className="w-5 h-5 text-sky-400 shrink-0" />
+              <span className="font-semibold text-xs sm:text-sm">
                 {isQuote ? 'Devis Proforma' : 'Facture'} : <span className="font-mono-nums text-amber-400">{sale.saleNumber}</span>
               </span>
             </div>
-            {/* 1-Page Guarantee Badge */}
-            <span className="hidden sm:inline-flex items-center gap-1 text-[11px] bg-amber-400/20 text-amber-300 border border-amber-400/30 px-2 py-0.5 rounded font-medium">
-              📄 1 Page Garantie ({itemCount} articles)
+            {/* Design & 1-Page Guarantee & < 3 Mo Badge */}
+            <span className="hidden md:inline-flex items-center gap-1 text-[11px] bg-blue-900/60 text-blue-200 border border-blue-400/40 px-2 py-0.5 rounded font-medium">
+              {isQuote ? `📋 Devis Proforma · 1 Page Garantie · < 3 Mo (${itemCount} article${itemCount > 1 ? 's' : ''})` : `✨ Facture A4 · < 3 Mo Certifié · Jauge Active (${itemCount} art.)`}
             </span>
           </div>
 
-          <div className="flex items-center gap-2">
-            {/* Quick toggles for Visa (Signature & Sceau) */}
+          <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+            {/* Quick toggles for Visa & Gauge */}
             {printFormat === 'A4' && (
-              <div className="hidden lg:flex items-center gap-1 bg-neutral-800 p-0.5 rounded-lg border border-neutral-700 text-xs">
+              <div className="hidden xl:flex items-center gap-1 bg-neutral-800 p-0.5 rounded-lg border border-neutral-700 text-xs">
+                {/* Jauge Toggle (uniquement factures) */}
+                {!isQuote && (
+                  <button
+                    type="button"
+                    onClick={() => setIncludeGauge(!includeGauge)}
+                    className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1 ${
+                      includeGauge ? 'bg-blue-600 text-white font-bold shadow-xs' : 'text-neutral-400 hover:text-white'
+                    }`}
+                    title="Afficher ou masquer la jauge de règlement et solvabilité"
+                  >
+                    <Gauge className="w-3 h-3" />
+                    <span>Jauge: {includeGauge ? 'OUI' : 'NON'}</span>
+                  </button>
+                )}
+
                 <button
                   type="button"
                   onClick={() => setIncludeSignature(!includeSignature)}
                   className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1 ${
-                    includeSignature ? 'bg-blue-900/80 text-blue-200 font-bold' : 'text-neutral-400 hover:text-white'
+                    includeSignature ? 'bg-indigo-900/90 text-indigo-200 font-bold' : 'text-neutral-400 hover:text-white'
                   }`}
-                  title="Activer ou désactiver la signature sur le visa Congo Tech"
+                  title="Activer ou désactiver la signature sur le visa officiel"
                 >
                   <PenTool className="w-3 h-3" />
                   <span>Signature: {includeSignature ? 'OUI' : 'NON'}</span>
@@ -126,13 +271,28 @@ export const InvoicePrintModal: React.FC = () => {
                   type="button"
                   onClick={() => setIncludeStamp(!includeStamp)}
                   className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1 ${
-                    includeStamp ? 'bg-emerald-900/80 text-emerald-200 font-bold' : 'text-neutral-400 hover:text-white'
+                    includeStamp ? 'bg-emerald-900/90 text-emerald-200 font-bold' : 'text-neutral-400 hover:text-white'
                   }`}
-                  title="Activer ou désactiver le sceau officiel sur le visa Congo Tech"
+                  title="Activer ou désactiver le sceau officiel"
                 >
                   <Stamp className="w-3 h-3" />
                   <span>Sceau: {includeStamp ? 'OUI' : 'NON'}</span>
                 </button>
+
+                {/* Cachet Payé Cash (uniquement factures) */}
+                {!isQuote && (
+                  <button
+                    type="button"
+                    onClick={() => setIncludeCashPaidStamp(!includeCashPaidStamp)}
+                    className={`px-2.5 py-1 rounded text-[11px] font-medium transition-colors flex items-center gap-1 ${
+                      includeCashPaidStamp ? 'bg-rose-900/90 text-rose-200 font-bold' : 'text-neutral-400 hover:text-white'
+                    }`}
+                    title="Apposer ou retirer le cachet PAYÉ CASH"
+                  >
+                    <Stamp className="w-3 h-3 text-rose-400" />
+                    <span>Payé Cash: {includeCashPaidStamp ? 'OUI' : 'NON'}</span>
+                  </button>
+                )}
               </div>
             )}
 
@@ -140,21 +300,21 @@ export const InvoicePrintModal: React.FC = () => {
             <div className="flex items-center bg-neutral-800 p-0.5 rounded-lg border border-neutral-700 text-xs">
               <button
                 onClick={() => setPrintFormat('A4')}
-                className={`px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5 ${
-                  printFormat === 'A4' ? 'bg-neutral-950 text-amber-400 shadow-xs' : 'text-neutral-300 hover:text-white'
+                className={`px-2.5 sm:px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1 sm:gap-1.5 ${
+                  printFormat === 'A4' ? 'bg-blue-600 text-white shadow-xs font-bold' : 'text-neutral-300 hover:text-white'
                 }`}
               >
                 <FileText className="w-3.5 h-3.5" />
-                <span>Format A4</span>
+                <span className="hidden sm:inline">Format </span>A4
               </button>
               <button
                 onClick={() => setPrintFormat('THERMAL')}
-                className={`px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1.5 ${
-                  printFormat === 'THERMAL' ? 'bg-neutral-950 text-amber-400 shadow-xs' : 'text-neutral-300 hover:text-white'
+                className={`px-2.5 sm:px-3 py-1.5 rounded-md font-medium transition-colors flex items-center gap-1 sm:gap-1.5 ${
+                  printFormat === 'THERMAL' ? 'bg-blue-600 text-white shadow-xs font-bold' : 'text-neutral-300 hover:text-white'
                 }`}
               >
                 <Receipt className="w-3.5 h-3.5" />
-                <span>Ticket (80mm)</span>
+                <span>Ticket</span>
               </button>
             </div>
 
@@ -162,373 +322,94 @@ export const InvoicePrintModal: React.FC = () => {
               onClick={() => {
                 setActiveWhatsAppClient({ client, sale });
               }}
-              className="px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-1.5 shadow-xs"
-              title="Envoyer la facture via WhatsApp"
+              className="px-2.5 sm:px-3 py-1.5 text-xs font-medium text-white bg-emerald-600 hover:bg-emerald-700 rounded-lg transition-colors flex items-center gap-1 sm:gap-1.5 shadow-xs"
+              title="Envoyer le document PDF via WhatsApp"
             >
               <Share2 className="w-3.5 h-3.5" />
               <span className="hidden sm:inline">WhatsApp</span>
             </button>
 
-            {/* Direct PDF Download Button with confirmation dialog */}
+            {/* Direct PDF Download Button */}
             <button
               onClick={handleDownloadPDF}
               disabled={isGeneratingPDF}
-              className="px-3.5 py-1.5 text-xs font-medium text-white bg-emerald-700 hover:bg-emerald-600 disabled:opacity-50 rounded-lg transition-colors flex items-center gap-1.5 font-bold shadow-xs"
-              title="Télécharger directement le fichier PDF sur votre appareil"
+              className="px-2.5 sm:px-3.5 py-1.5 text-xs font-medium text-white bg-blue-700 hover:bg-blue-600 disabled:opacity-50 rounded-lg transition-colors flex items-center gap-1 sm:gap-1.5 font-bold shadow-xs"
+              title="Télécharger le document au format PDF haute résolution"
             >
               {isGeneratingPDF ? (
                 <Loader2 className="w-3.5 h-3.5 animate-spin" />
               ) : (
-                <Download className="w-3.5 h-3.5 text-emerald-200" />
+                <Download className="w-3.5 h-3.5 text-blue-200" />
               )}
-              <span>{isGeneratingPDF ? 'Création PDF...' : 'Télécharger PDF'}</span>
+              <span>{isGeneratingPDF ? 'PDF...' : 'PDF'}</span>
             </button>
 
+            {/* Direct Print to Default Printer Button & Auto-Download to C:\hibtech */}
             <button
               onClick={handlePrint}
-              className="px-3.5 py-1.5 text-xs font-medium text-neutral-900 bg-amber-400 hover:bg-amber-300 rounded-lg transition-colors flex items-center gap-1.5 font-bold shadow-xs"
+              disabled={isPrinting}
+              className="px-3 sm:px-4 py-1.5 text-xs font-bold text-neutral-950 bg-amber-400 hover:bg-amber-300 active:scale-95 disabled:opacity-50 rounded-lg transition-all flex items-center gap-1.5 shadow-sm cursor-pointer"
+              title={`Envoyer directement à l'imprimante par défaut, sauvegarder le PDF dans ${settings.pdfExportPath || 'C:\\hibtech'} et fermer immédiatement (Raccourci : Entrée ou Ctrl+P)`}
             >
-              <Printer className="w-4 h-4" />
-              <span>Imprimer</span>
+              {isPrinting ? (
+                <Loader2 className="w-3.5 h-3.5 sm:w-4 sm:h-4 animate-spin text-neutral-900" />
+              ) : (
+                <Printer className="w-3.5 h-3.5 sm:w-4 sm:h-4 text-neutral-900" />
+              )}
+              <span>{isPrinting ? 'Impression & PDF...' : 'Imprimer'}</span>
+              <span className="hidden lg:inline-flex items-center text-[10px] bg-amber-500/90 text-neutral-950 px-1 py-0.2 rounded font-mono font-bold tracking-tight">
+                PDF C:\hibtech
+              </span>
+              <kbd className="hidden md:inline-block px-1 py-0.2 text-[9px] bg-amber-500/80 text-neutral-950 rounded font-mono font-bold">
+                Entrée
+              </kbd>
             </button>
 
             <button
               onClick={() => setActivePrintSale(null)}
-              className="text-neutral-400 hover:text-white p-1.5 rounded-lg transition-colors ml-2"
+              className="text-neutral-400 hover:text-white p-1 sm:p-1.5 rounded-lg transition-colors ml-1 sm:ml-2"
+              aria-label="Fermer"
             >
               <X className="w-5 h-5" />
             </button>
           </div>
         </div>
 
+        {/* Hibtech Direct Print & Auto-Save Notification Bar */}
+        <div className="no-print bg-amber-50 border-b border-amber-200 px-3 sm:px-6 py-1.5 flex flex-wrap items-center justify-between gap-2 text-xs text-amber-950">
+          <div className="flex items-center gap-2">
+            <span className="flex h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+            <span className="text-[11px] sm:text-xs">
+              <strong className="font-bold text-amber-950">Mode Impression Rapide :</strong> Clic sur <strong className="font-bold text-neutral-900 underline">Imprimer</strong> envoie le document à l'imprimante, télécharge le PDF dans <span className="font-mono bg-amber-100 px-1 py-0.5 rounded text-amber-950 font-bold">{settings.pdfExportPath || 'C:\\hibtech'}</span> et ferme cette fenêtre automatiquement.
+            </span>
+          </div>
+          <span className="hidden md:inline-block text-[10px] text-amber-800 bg-amber-100 px-2 py-0.5 rounded font-mono font-bold">
+            Raccourci : Touche Entrée
+          </span>
+        </div>
+
         {/* Print Preview Container */}
-        <div className="p-4 sm:p-8 overflow-auto bg-neutral-100 flex justify-center flex-1">
+        <div className="print-preview-container p-4 sm:p-8 overflow-auto bg-neutral-200/70 flex justify-center flex-1">
           {printFormat === 'A4' ? (
-            /* ================= FORMAT A4 FACTURE ================= */
-            <div
-              ref={printContainerRef}
-              className={`print-page bg-white w-[794px] min-w-[794px] ${isUltraCompact ? 'p-5 text-[11px]' : isCompact ? 'p-6 text-xs' : 'p-8 text-xs'} shadow-md rounded-lg border border-neutral-300/80 text-neutral-900 leading-normal shrink-0`}
-            >
-              
-              {/* Entête Entreprise avec Logo si présent */}
-              <div className={`border-b-2 border-neutral-900 ${isUltraCompact ? 'pb-2 mb-2' : isCompact ? 'pb-3 mb-3' : 'pb-4 mb-4'}`}>
-                <div className="flex flex-row justify-between items-start gap-4">
-                  <div className="flex items-start gap-3">
-                    {includeLogo && settings.logoUrl && (
-                      <div className="shrink-0 bg-white p-1 rounded border border-neutral-200 shadow-2xs">
-                        <img
-                          src={settings.logoUrl}
-                          alt={settings.name}
-                          className={`${isUltraCompact ? 'h-10 max-w-[80px]' : isCompact ? 'h-12 max-w-[100px]' : 'h-14 max-w-[120px]'} object-contain`}
-                        />
-                      </div>
-                    )}
-                    <div>
-                      <h1 className={`${isUltraCompact ? 'text-lg font-extrabold' : isCompact ? 'text-xl font-bold' : 'text-xl sm:text-2xl font-bold'} tracking-tight text-neutral-900 uppercase`}>
-                        {settings.name}
-                      </h1>
-                      <p className="text-xs text-neutral-600 font-medium mt-0.5">
-                        {settings.slogan}
-                      </p>
-                      <p className="text-[11px] text-neutral-500 mt-0.5">
-                        {settings.address}, {settings.city} · Tél: <span className="font-mono-nums">{settings.phone1}</span> {settings.phone2 ? `| ${settings.phone2}` : ''}
-                      </p>
-                    </div>
-                  </div>
-
-                  {/* Document Title & Reference */}
-                  <div className="text-right w-auto shrink-0">
-                    <div className={`inline-block ${isUltraCompact ? 'px-2.5 py-0.5 text-[11px]' : 'px-3 py-1 text-xs'} bg-neutral-900 text-amber-400 font-bold uppercase tracking-wider rounded`}>
-                      {isQuote ? 'DEVIS PROFORMA' : isReceipt ? 'REÇU DE PAIEMENT' : 'FACTURE'}
-                    </div>
-                    <div className="mt-1 space-y-0.5 font-mono-nums text-xs">
-                      <p className="font-bold text-sm text-neutral-900">{sale.saleNumber}</p>
-                      {sale.dgiNfu && (
-                        <p className="text-[11px] text-neutral-600 font-medium">
-                          Réf. : <span className="font-bold text-neutral-900">{sale.dgiNfu}</span>
-                        </p>
-                      )}
-                      <p className="text-neutral-500 text-[11px]">Date : {formatDateTime(sale.createdAt)}</p>
-                      {sale.dueDate && (
-                        <p className="text-rose-600 font-medium text-[11px]">Échéance : {formatDate(sale.dueDate)}</p>
-                      )}
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Cadres Identifiants Émetteur & Client */}
-              <div className={`grid grid-cols-2 gap-3 ${isUltraCompact ? 'my-2 p-2.5 text-[10px]' : isCompact ? 'my-2.5 p-3 text-xs' : 'my-4 p-4 text-xs'} bg-neutral-50 rounded-lg border border-neutral-200`}>
-                {/* Émetteur Fiscale */}
-                <div className="space-y-0.5">
-                  <span className="font-bold text-neutral-800 uppercase tracking-wider block text-[9px] pb-0.5 border-b border-neutral-200">
-                    Identifiants de l'Émetteur
-                  </span>
-                  <p><span className="text-neutral-500">NIF :</span> <span className="font-mono-nums font-bold text-neutral-900">{settings.nif || 'NIF-NON-DEFINI'}</span> | <span className="text-neutral-500">RCCM :</span> <span className="font-mono-nums font-semibold">{settings.rccm}</span></p>
-                  <p><span className="text-neutral-500">Id. Nat :</span> <span className="font-mono-nums font-semibold">{settings.idNat}</span> | <span className="text-neutral-500">Régime :</span> <span className="font-medium text-neutral-800">{settings.dgiRegime || 'Régime Général'}</span></p>
-                  {sale.dgiTerminalId && <p><span className="text-neutral-500">N° Terminal :</span> <span className="font-mono-nums font-semibold text-neutral-700">{sale.dgiTerminalId}</span></p>}
-                </div>
-
-                {/* Client Box */}
-                <div className="space-y-0.5 border-l border-neutral-300 pl-3">
-                  <span className="font-bold text-neutral-800 uppercase tracking-wider block text-[9px] pb-0.5 border-b border-neutral-200">
-                    Facturé au Client (Acheteur)
-                  </span>
-                  <p className="font-bold text-neutral-900 text-xs">{sale.clientName}</p>
-                  <p><span className="text-neutral-500">NIF / ID :</span> <span className="font-mono-nums font-semibold text-neutral-900">{sale.clientNif || client.nif || client.rccmOrNif || 'Consommateur final'}</span> {sale.clientPhone ? `· Tél: ${sale.clientPhone}` : ''}</p>
-                  {sale.clientAddress && <p className="text-neutral-600 truncate"><span className="text-neutral-500">Adresse :</span> {sale.clientAddress}</p>}
-                </div>
-              </div>
-
-              {/* Tableau des Articles & Prestations */}
-              <div className={`overflow-x-auto ${isUltraCompact ? 'my-1.5' : isCompact ? 'my-2.5' : 'my-4'}`}>
-                <table className="w-full border-collapse text-left text-xs">
-                  <thead>
-                    <tr className={`border-b-2 border-neutral-800 bg-neutral-100 text-neutral-800 uppercase font-semibold ${isUltraCompact ? 'text-[9px]' : 'text-[10px]'}`}>
-                      <th className={`${isUltraCompact ? 'py-1 px-2' : isCompact ? 'py-1.5 px-2.5' : 'py-2.5 px-3'}`}>Réf / Désignation</th>
-                      <th className={`${isUltraCompact ? 'py-1 px-1.5' : isCompact ? 'py-1.5 px-2' : 'py-2.5 px-2'} text-center`}>Gr. TVA</th>
-                      <th className={`${isUltraCompact ? 'py-1 px-2' : isCompact ? 'py-1.5 px-2.5' : 'py-2.5 px-3'} text-right`}>Qté</th>
-                      <th className={`${isUltraCompact ? 'py-1 px-2' : isCompact ? 'py-1.5 px-2.5' : 'py-2.5 px-3'} text-right`}>Prix Unit. HT ($)</th>
-                      <th className={`${isUltraCompact ? 'py-1 px-2' : isCompact ? 'py-1.5 px-2.5' : 'py-2.5 px-3'} text-right`}>Total HT ($)</th>
-                      <th className={`${isUltraCompact ? 'py-1 px-2' : isCompact ? 'py-1.5 px-2.5' : 'py-2.5 px-3'} text-right`}>
-                        {sale.taxPercent > 0 ? `TVA ${sale.taxPercent}% ($)` : 'TVA ($)'}
-                      </th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-200 font-mono-nums">
-                    {sale.items.map((item, idx) => {
-                      const itemTaxAmount = item.taxGroup === 'A' && sale.taxPercent > 0 ? (item.subtotalUSD * 0.16) : 0;
-                      return (
-                        <tr key={idx} className="hover:bg-neutral-50/50">
-                          <td className={`${isUltraCompact ? 'py-0.5 px-2 text-[10px]' : isCompact ? 'py-1 px-2.5 text-[11px]' : 'py-2 px-3 text-xs'} font-sans`}>
-                            <div className="flex items-center gap-1.5">
-                              <span className="font-semibold text-neutral-900 leading-tight">{item.name}</span>
-                              {item.code && <span className="text-[9px] text-neutral-400 font-mono">({item.code})</span>}
-                            </div>
-                          </td>
-                          <td className={`${isUltraCompact ? 'py-0.5 px-1.5 text-[9px]' : isCompact ? 'py-1 px-2 text-[10px]' : 'py-2 px-2 text-[11px]'} text-center`}>
-                            <span className="font-semibold text-neutral-800 bg-neutral-100 px-1 py-0.5 rounded border border-neutral-200">
-                              {item.taxGroup || 'A'}
-                            </span>
-                          </td>
-                          <td className={`${isUltraCompact ? 'py-0.5 px-2 text-[10px]' : isCompact ? 'py-1 px-2.5 text-[11px]' : 'py-2 px-3 text-xs'} text-right font-medium`}>
-                            {item.quantity} {item.unit}
-                          </td>
-                          <td className={`${isUltraCompact ? 'py-0.5 px-2 text-[10px]' : isCompact ? 'py-1 px-2.5 text-[11px]' : 'py-2 px-3 text-xs'} text-right`}>
-                            ${item.unitPriceUSD.toFixed(2)}
-                          </td>
-                          <td className={`${isUltraCompact ? 'py-0.5 px-2 text-[10px]' : isCompact ? 'py-1 px-2.5 text-[11px]' : 'py-2 px-3 text-xs'} text-right font-semibold text-neutral-900`}>
-                            ${item.subtotalUSD.toFixed(2)}
-                          </td>
-                          <td className={`${isUltraCompact ? 'py-0.5 px-2 text-[10px]' : isCompact ? 'py-1 px-2.5 text-[11px]' : 'py-2 px-3 text-xs'} text-right text-neutral-600`}>
-                            ${itemTaxAmount.toFixed(2)}
-                          </td>
-                        </tr>
-                      );
-                    })}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Tableau de Ventilation Fiscale (Tableau des Taxes) */}
-              <div className={`${isUltraCompact ? 'my-1.5 p-2 text-[10px]' : isCompact ? 'my-2 p-2.5 text-[11px]' : 'my-3 p-3 text-xs'} bg-neutral-50 rounded-lg border border-neutral-200`}>
-                <span className="font-bold text-neutral-800 uppercase tracking-wider block text-[9px] mb-1">
-                  Ventilation de la TVA
-                </span>
-                <table className="w-full text-[10px] font-mono-nums border-collapse">
-                  <thead>
-                    <tr className="border-b border-neutral-300 text-neutral-600 uppercase text-[8px]">
-                      <th className="text-left pb-0.5">Groupe</th>
-                      <th className="text-right pb-0.5">Base HT ($)</th>
-                      <th className="text-right pb-0.5">Taux</th>
-                      <th className="text-right pb-0.5">Montant TVA ($)</th>
-                      <th className="text-right pb-0.5">Total TTC ($)</th>
-                    </tr>
-                  </thead>
-                  <tbody className="divide-y divide-neutral-200">
-                    <tr>
-                      <td className="py-0.5 font-sans font-medium text-neutral-800">
-                        {sale.taxPercent > 0 ? `Groupe A : Taux Standard TVA ${sale.taxPercent}%` : 'Vente Hors TVA / Non-assujetti (0%)'}
-                      </td>
-                      <td className="py-0.5 text-right">${(sale.dgiVatBreakdown?.groupA?.baseUSD || sale.subtotalUSD).toFixed(2)}</td>
-                      <td className="py-0.5 text-right">{sale.taxPercent}%</td>
-                      <td className="py-0.5 text-right font-semibold text-neutral-900">${sale.taxAmountUSD.toFixed(2)}</td>
-                      <td className="py-0.5 text-right font-bold">${sale.totalUSD.toFixed(2)}</td>
-                    </tr>
-                    {sale.dgiVatBreakdown?.groupC?.baseUSD > 0 && (
-                      <tr>
-                        <td className="py-0.5 font-sans text-neutral-600">Groupe C : Exonéré</td>
-                        <td className="py-0.5 text-right">${sale.dgiVatBreakdown.groupC.baseUSD.toFixed(2)}</td>
-                        <td className="py-0.5 text-right">0%</td>
-                        <td className="py-0.5 text-right">$0.00</td>
-                        <td className="py-0.5 text-right">${sale.dgiVatBreakdown.groupC.baseUSD.toFixed(2)}</td>
-                      </tr>
-                    )}
-                  </tbody>
-                </table>
-              </div>
-
-              {/* Totaux & Dispositif d'Authentification / QR Code */}
-              <div className={`grid grid-cols-12 gap-4 ${isUltraCompact ? 'pt-1.5' : 'pt-3'} border-t-2 border-neutral-900 items-start`}>
-                {/* Bloc Sceau & QR Code (7 Cols) */}
-                <div className={`col-span-7 flex gap-3 ${isUltraCompact ? 'p-2' : 'p-3'} bg-neutral-50 rounded-lg border border-neutral-200`}>
-                  <div className="shrink-0 bg-white p-1.5 rounded border border-neutral-300 shadow-2xs">
-                    <QRCodeSVG
-                      value={sale.dgiQrPayload || `DOC-RDC|${sale.saleNumber}|${sale.totalUSD}|${sale.dgiSecurityCode}`}
-                      size={isUltraCompact ? 64 : isCompact ? 76 : 92}
-                      level="M"
-                    />
-                    <span className="block text-[7px] font-bold text-center mt-0.5 text-neutral-600 font-mono">
-                      SCAN QR
-                    </span>
-                  </div>
-
-                  <div className="space-y-0.5 text-[10px] font-mono-nums text-neutral-700">
-                    <div className="flex items-center gap-1 text-emerald-800 font-sans font-bold text-[11px]">
-                      <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                      <span>Sceau d'Authentification</span>
-                    </div>
-                    <p><span className="text-neutral-500 font-sans">Réf. :</span> <span className="font-bold text-neutral-900">{sale.dgiNfu || 'SFN-00000'}</span></p>
-                    <p><span className="text-neutral-500 font-sans">CS :</span> <span className="font-bold text-neutral-900">{sale.dgiSecurityCode}</span></p>
-                    <p><span className="text-neutral-500 font-sans">N° Trans :</span> <span className="font-bold text-emerald-800">{sale.dgiReceiptNumber || 'REC-2026-0049281'}</span></p>
-                    <p><span className="text-neutral-500 font-sans">Compteur :</span> #{sale.dgiFiscalCounter || 1001}</p>
-                    <p><span className="text-neutral-500 font-sans">Taux du jour :</span> 1$ = {rate} FC</p>
-                  </div>
-                </div>
-
-                {/* Totaux Financiers (5 Cols) */}
-                <div className={`col-span-5 ${isUltraCompact ? 'space-y-1 p-2 text-[11px]' : 'space-y-1.5 p-3 text-xs'} font-mono-nums bg-neutral-50 rounded-lg border border-neutral-200`}>
-                  <div className="flex justify-between text-neutral-600">
-                    <span>Total HT :</span>
-                    <span>${sale.subtotalUSD.toFixed(2)}</span>
-                  </div>
-
-                  {sale.discountUSD > 0 && (
-                    <div className="flex justify-between text-emerald-700">
-                      <span>Remise :</span>
-                      <span>-${sale.discountUSD.toFixed(2)}</span>
-                    </div>
-                  )}
-
-                  {sale.taxPercent > 0 ? (
-                    <div className="flex justify-between text-neutral-700">
-                      <span>TVA ({sale.taxPercent}%) :</span>
-                      <span>+${sale.taxAmountUSD.toFixed(2)}</span>
-                    </div>
-                  ) : (
-                    <div className="flex justify-between text-neutral-500 text-[11px] italic">
-                      <span>TVA :</span>
-                      <span>0.00 $ (Non applicable / Exonéré)</span>
-                    </div>
-                  )}
-
-                  <div className="border-t-2 border-neutral-900 pt-1 mt-1 flex justify-between font-bold text-sm text-neutral-900">
-                    <span>TOTAL TTC ($) :</span>
-                    <span>${sale.totalUSD.toFixed(2)}</span>
-                  </div>
-
-                  <div className="flex justify-between font-bold text-neutral-900 bg-amber-100/80 px-2 py-0.5 rounded text-xs">
-                    <span>TOTAL (CDF) :</span>
-                    <span>{new Intl.NumberFormat('fr-FR').format(sale.totalCDF)} FC</span>
-                  </div>
-
-                  <div className="border-t border-neutral-200 pt-1 text-[10px] space-y-0.5">
-                    <div className="flex justify-between text-neutral-600">
-                      <span>Payé :</span>
-                      <span className="font-semibold text-emerald-700">${sale.amountPaidUSD.toFixed(2)}</span>
-                    </div>
-                    {sale.remainingDebtUSD > 0 && (
-                      <div className="flex justify-between font-bold text-rose-600 bg-rose-50 px-1 py-0.5 rounded">
-                        <span>SOLDE RESTANT :</span>
-                        <span>${sale.remainingDebtUSD.toFixed(2)}</span>
-                      </div>
-                    )}
-                  </div>
-                </div>
-              </div>
-
-              {/* Règlement Mobile Money & Banques RDC */}
-              <div className={`mt-2 ${isUltraCompact ? 'p-1.5 text-[9px]' : 'p-2.5 text-[10px]'} bg-neutral-50 rounded-lg border border-neutral-200`}>
-                <span className="font-bold text-neutral-800 uppercase block mb-0.5 text-[9px]">
-                  Paiements Directs Autorisés
-                </span>
-                <div className="grid grid-cols-2 gap-2 text-neutral-600">
-                  <div>
-                    {settings.mpesaNumber && <p>• <span className="font-semibold text-neutral-900">M-Pesa :</span> {settings.mpesaNumber} ({settings.mpesaName})</p>}
-                    {settings.orangeMoneyNumber && <p>• <span className="font-semibold text-neutral-900">Orange Money :</span> {settings.orangeMoneyNumber}</p>}
-                    {settings.airtelMoneyNumber && <p>• <span className="font-semibold text-neutral-900">Airtel Money :</span> {settings.airtelMoneyNumber}</p>}
-                  </div>
-                  <div>
-                    {settings.bankDetails && <p>• <span className="font-semibold text-neutral-900">Banque :</span> {settings.bankDetails}</p>}
-                  </div>
-                </div>
-              </div>
-
-              {/* Signatures & Visa Entreprise */}
-              <div className={`mt-2.5 ${isUltraCompact ? 'pt-1.5' : 'pt-2.5'} border-t border-neutral-200 grid grid-cols-2 text-center text-xs text-neutral-600 items-start`}>
-                {/* Client / Réceptionnaire */}
-                <div className="flex flex-col items-center">
-                  <p className={`font-semibold text-neutral-800 ${isUltraCompact ? 'mb-2' : isCompact ? 'mb-3' : 'mb-6'}`}>
-                    Visa du Client / Réceptionnaire
-                  </p>
-                  <div className={`${isUltraCompact ? 'h-10' : 'h-14'} flex items-end justify-center`}>
-                    <p className="text-[9px] text-neutral-400">Date & Signature</p>
-                  </div>
-                </div>
-
-                {/* Visa Entreprise (Pour Congo Tech / Entreprise) */}
-                <div className="flex flex-col items-center relative">
-                  <p className={`font-semibold text-neutral-800 ${isUltraCompact ? 'mb-1' : 'mb-1.5'}`}>
-                    {settings.signatoryTitle || `Pour ${settings.name}`}
-                  </p>
-
-                  {/* Container for Stamp & Signature */}
-                  <div className={`relative ${isUltraCompact ? 'h-14' : isCompact ? 'h-16' : 'h-20'} w-full flex items-center justify-center`}>
-                    {/* Sceau / Cachet Officiel */}
-                    {includeStamp && settings.stampUrl && (
-                      <img
-                        src={settings.stampUrl}
-                        alt="Sceau officiel"
-                        className={`absolute ${isUltraCompact ? 'w-14 h-14' : isCompact ? 'w-16 h-16' : 'w-20 h-20'} object-contain -rotate-6 pointer-events-none select-none`}
-                        style={{ mixBlendMode: 'multiply' }}
-                      />
-                    )}
-
-                    {/* Signature Autorisée */}
-                    {includeSignature && settings.signatureUrl && (
-                      <img
-                        src={settings.signatureUrl}
-                        alt="Signature autorisée"
-                        className={`relative z-10 ${isUltraCompact ? 'h-10 max-w-[130px]' : isCompact ? 'h-12 max-w-[150px]' : 'h-14 max-w-[180px]'} object-contain pointer-events-none select-none`}
-                      />
-                    )}
-
-                    {!includeStamp && !includeSignature && (
-                      <div className="h-full flex items-center justify-center">
-                        <span className="text-[9px] text-neutral-400 italic">
-                          (Cachet & Signature Autorisée)
-                        </span>
-                      </div>
-                    )}
-                  </div>
-
-                  <p className="text-[9px] text-neutral-500 font-medium mt-0.5">
-                    {settings.signatoryName || 'Cachet & Signature Autorisée'}
-                  </p>
-                </div>
-              </div>
-
-              {/* Mentions de bas de page */}
-              <div className={`mt-2 text-center ${isUltraCompact ? 'text-[8px] pt-1' : 'text-[9px] pt-1.5'} text-neutral-500 border-t border-neutral-100 leading-tight`}>
-                {settings.invoiceFooterNotes || 'Merci pour votre confiance. Pour toute question ou assistance, veuillez contacter notre service client.'}
-              </div>
-            </div>
+            /* ================= FORMAT A4 FACTURE (BLEU & BLANC + JAUGE) ================= */
+            <InvoiceDocumentA4
+              sale={sale}
+              client={client}
+              settings={settings}
+              rate={rate}
+              includeGauge={includeGauge}
+              includeSignature={includeSignature}
+              includeStamp={includeStamp}
+              includeCashPaidStamp={includeCashPaidStamp}
+              includeLogo={includeLogo}
+              containerRef={printContainerRef}
+            />
           ) : (
             /* ================= FORMAT TICKET DE CAISSE THERMIQUE 80MM ================= */
-            <div ref={printContainerRef} className="print-page bg-white w-80 p-5 shadow-md rounded border border-neutral-300 font-mono text-[11px] leading-tight text-neutral-900">
+            <div ref={printContainerRef} className="print-page bg-white w-80 p-5 shadow-md rounded-lg border border-neutral-300 font-mono text-[11px] leading-tight text-neutral-900">
               <div className="text-center pb-2.5 border-b border-dashed border-neutral-400">
                 <p className="font-bold text-xs uppercase text-neutral-800">TICKET DE CAISSE</p>
-                <p className="font-bold text-sm tracking-tight uppercase mt-1">{settings.name}</p>
+                <p className="font-bold text-sm tracking-tight uppercase mt-1 text-blue-950">{settings.name}</p>
                 <p className="text-[10px]">{settings.address}, {settings.city}</p>
                 <p className="text-[10px]">Tél : {settings.phone1}</p>
                 {settings.nif && <p className="text-[10px] font-bold">NIF : {settings.nif} | RCCM : {settings.rccm}</p>}
@@ -565,7 +446,7 @@ export const InvoicePrintModal: React.FC = () => {
                 ))}
               </div>
 
-              {/* Totaux & Ventilation */}
+              {/* Totaux & Jauge Ticket */}
               <div className="py-2 border-b border-dashed border-neutral-400 space-y-1 text-xs">
                 <div className="flex justify-between">
                   <span>TOTAL HT :</span>
@@ -581,21 +462,42 @@ export const InvoicePrintModal: React.FC = () => {
                   <span>TOTAL TTC ($) :</span>
                   <span>${sale.totalUSD.toFixed(2)}</span>
                 </div>
-                <div className="flex justify-between font-bold">
+                <div className="flex justify-between font-bold text-blue-900">
                   <span>TOTAL TTC (CDF) :</span>
                   <span>{new Intl.NumberFormat('fr-FR').format(sale.totalCDF)} FC</span>
                 </div>
                 <div className="text-[10px] text-neutral-500">Taux BCC : 1$ = {rate} FC</div>
-                <div className="flex justify-between pt-1 text-neutral-700">
-                  <span>Payé ({paymentInfo.label}) :</span>
-                  <span>${sale.amountPaidUSD.toFixed(2)}</span>
-                </div>
-                {sale.remainingDebtUSD > 0 && (
-                  <div className="flex justify-between font-bold text-rose-600">
-                    <span>SOLDE DÛ :</span>
-                    <span>${sale.remainingDebtUSD.toFixed(2)}</span>
+
+                {/* Ticket Settlement Badge */}
+                <div className="pt-1 border-t border-neutral-200">
+                  <div className="flex justify-between items-center text-[10px] font-bold">
+                    <span>JAUGE PAIEMENT :</span>
+                    <span className={isFullyPaid ? 'text-emerald-700 font-black' : 'text-amber-700 font-black'}>
+                      {percentPaid}% {isFullyPaid ? '(SOLDÉ)' : '(ACOMPTE)'}
+                    </span>
                   </div>
-                )}
+                  <div className="flex justify-between pt-0.5 text-neutral-700">
+                    <span>Payé ({paymentInfo.label}) :</span>
+                    <span>${sale.amountPaidUSD.toFixed(2)}</span>
+                  </div>
+                  {sale.remainingDebtUSD > 0 && (
+                    <div className="flex justify-between font-bold text-rose-600">
+                      <span>SOLDE RESTANT :</span>
+                      <span>${sale.remainingDebtUSD.toFixed(2)}</span>
+                    </div>
+                  )}
+
+                  {/* Cachet PAYÉ CASH / COMPTANT sur Ticket */}
+                  {includeCashPaidStamp && settings.cashPaidStampUrl && (
+                    <div className="pt-2 pb-1 flex justify-center">
+                      <img
+                        src={settings.cashPaidStampUrl}
+                        alt="Cachet Payé Cash"
+                        className="w-56 h-24 object-contain drop-shadow-sm -rotate-3"
+                      />
+                    </div>
+                  )}
+                </div>
               </div>
 
               {/* QR Code & Digital Signature */}
@@ -607,7 +509,7 @@ export const InvoicePrintModal: React.FC = () => {
                 />
                 <span className="text-[9px] font-bold">CS: {sale.dgiSecurityCode}</span>
                 <span className="text-[8px] text-emerald-700 font-bold">{sale.dgiReceiptNumber || 'REC-2026-0049281'}</span>
-                <span className="text-[8px] text-neutral-500">CODE D'AUTHENTIFICATION</span>
+                <span className="text-[8px] text-neutral-500">CODE D'AUTHENTIFICATION DGI</span>
               </div>
 
               <div className="pt-2 text-center text-[9px] text-neutral-600 space-y-0.5">
@@ -624,12 +526,12 @@ export const InvoicePrintModal: React.FC = () => {
             <div className="bg-white rounded-2xl shadow-2xl border border-neutral-200 max-w-md w-full p-6 space-y-4">
               <div className="flex items-center justify-between pb-3 border-b border-neutral-100">
                 <div className="flex items-center gap-2.5">
-                  <div className="p-2 bg-indigo-50 text-indigo-700 rounded-lg">
+                  <div className="p-2 bg-blue-50 text-blue-700 rounded-lg">
                     <FileText className="w-5 h-5" />
                   </div>
                   <div>
                     <h3 className="font-bold text-sm text-neutral-900">Génération du Document PDF</h3>
-                    <p className="text-[11px] text-neutral-500">Options du visa officiel pour Congo Tech</p>
+                    <p className="text-[11px] text-neutral-500">Thème Bleu & Blanc avec Jauge & Sceau</p>
                   </div>
                 </div>
                 <button
@@ -642,10 +544,38 @@ export const InvoicePrintModal: React.FC = () => {
               </div>
 
               <p className="text-xs text-neutral-600 leading-relaxed">
-                Voulez-vous apposer la <strong>signature</strong> et le <strong>sceau officiel</strong> sur la facture au niveau du visa pour <strong className="text-neutral-900">{settings.name}</strong> ?
+                Configurez les options de mise en page pour la facture de <strong className="text-neutral-900">{settings.name}</strong> :
               </p>
 
+              <div className="flex items-center gap-2 p-2.5 rounded-xl bg-emerald-50 border border-emerald-200 text-xs text-emerald-900">
+                <CheckCircle2 className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="text-[11px] leading-snug">
+                  <strong>Poids optimisé garanti :</strong> Le fichier généré est compressé pour ne pas dépasser <strong>3 Mo</strong> (idéal pour WhatsApp, e-mail et mobile).
+                </span>
+              </div>
+
               <div className="space-y-2.5 bg-neutral-50 p-3.5 rounded-xl border border-neutral-200 text-xs">
+                {/* Option 0: Jauge */}
+                <label className="flex items-center justify-between p-2.5 rounded-lg bg-white border border-neutral-200 hover:border-blue-400 transition-colors cursor-pointer shadow-2xs">
+                  <div className="flex items-center gap-3">
+                    <input
+                      type="checkbox"
+                      checked={includeGauge}
+                      onChange={(e) => setIncludeGauge(e.target.checked)}
+                      className="rounded border-neutral-300 text-blue-600 focus:ring-blue-500 w-4 h-4"
+                    />
+                    <div>
+                      <span className="font-bold text-neutral-900 flex items-center gap-1.5">
+                        <Gauge className="w-3.5 h-3.5 text-blue-600" />
+                        Afficher la Jauge de Règlement
+                      </span>
+                      <span className="text-[10px] text-neutral-500 block mt-0.5">
+                        Indicateur visuel de solvabilité & acomptes
+                      </span>
+                    </div>
+                  </div>
+                </label>
+
                 {/* Option 1: Signature */}
                 <label className="flex items-center justify-between p-2.5 rounded-lg bg-white border border-neutral-200 hover:border-blue-400 transition-colors cursor-pointer shadow-2xs">
                   <div className="flex items-center gap-3">
@@ -743,12 +673,12 @@ export const InvoicePrintModal: React.FC = () => {
                   type="button"
                   onClick={executeDownloadPDF}
                   disabled={isGeneratingPDF}
-                  className="px-5 py-2 rounded-lg bg-emerald-700 hover:bg-emerald-600 text-white text-xs font-bold transition-colors flex items-center gap-2 shadow-xs"
+                  className="px-5 py-2 rounded-lg bg-blue-700 hover:bg-blue-600 text-white text-xs font-bold transition-colors flex items-center gap-2 shadow-xs"
                 >
                   {isGeneratingPDF ? (
                     <Loader2 className="w-4 h-4 animate-spin" />
                   ) : (
-                    <Download className="w-4 h-4 text-emerald-200" />
+                    <Download className="w-4 h-4 text-blue-200" />
                   )}
                   <span>Télécharger le PDF</span>
                 </button>

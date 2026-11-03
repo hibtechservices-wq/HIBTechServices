@@ -30,7 +30,6 @@ export type UserRole =
   | 'STOCK_MANAGER';  // Magasinier / Gestionnaire de Stock (Inventaire, Réappro)
 
 export interface UserPermissions {
-  canAccessDashboard: boolean;
   canAccessPOS: boolean;
   canCreateInvoices: boolean;
   canDeleteInvoices: boolean;
@@ -43,6 +42,8 @@ export interface UserPermissions {
   canManageUsers: boolean;
   canViewProfitMargins: boolean;
   canChangeExchangeRate: boolean;
+  canReprintInvoices?: boolean;
+  canAccessAccounting?: boolean;
 }
 
 export interface AppUser {
@@ -52,12 +53,15 @@ export interface AppUser {
   phone: string;
   role: UserRole;
   pinCode: string; // Code PIN à 4 chiffres pour bascule rapide de caisse
+  reprintPassword?: string; // Mot de passe d'autorisation de réimpression de ticket POS
   isActive: boolean;
-  assignedRegister?: string; // ex: "Caisse 1 - Showroom Gombe"
+  assignedRegister?: string; // ex: "Caisse Principale 1"
   permissions: UserPermissions;
   lastLogin?: string;
   createdAt: string;
 }
+
+export type PricingTier = 'RETAIL' | 'SEMI_WHOLESALE' | 'WHOLESALE';
 
 export interface ProductOrService {
   id: string;
@@ -69,11 +73,16 @@ export interface ProductOrService {
   description?: string;
   unit: string;
   priceUSD: number;
+  priceSemiWholesaleUSD?: number; // Prix Demi-Gros
+  priceWholesaleUSD?: number;     // Prix Grossiste
   costPriceUSD: number;
   stockQty: number;
   minStockAlert: number;
   taxGroup: FiscalTaxGroup;
   isActive: boolean;
+  imageUrl?: string;
+  features?: string[];
+  brand?: string;
   createdAt: string;
 }
 
@@ -82,6 +91,7 @@ export interface Client {
   name: string;
   companyName?: string;
   type: ClientType;
+  pricingTier?: PricingTier; // Grille tarifaire assignée au client
   phone: string;
   whatsapp?: string;
   email?: string;
@@ -94,7 +104,14 @@ export interface Client {
   totalSpentUSD: number;
   outstandingDebtUSD: number;
   notes?: string;
+  password?: string;
+  isRegisteredOnPortal?: boolean;
   createdAt: string;
+}
+
+export interface PortalCartItem {
+  item: ProductOrService;
+  quantity: number;
 }
 
 export interface SaleItem {
@@ -121,6 +138,9 @@ export interface PaymentEntry {
   reference?: string;
   recordedBy: string;
   notes?: string;
+  isReconciled?: boolean; // Pointé & Rapproché (Mobile Money / Banque)
+  reconciledAt?: string;
+  reconciledBy?: string;
 }
 
 export interface VatGroupSummary {
@@ -268,10 +288,17 @@ export interface CompanySettings {
   showLogoOnInvoices?: boolean;
   signatureUrl?: string;
   stampUrl?: string;
+  cashPaidStampUrl?: string; // Image / Cachet "PAYÉ CASH" ou "PAYÉ COMPTANT"
   signatoryTitle?: string;
   signatoryName?: string;
   includeSignatureOnInvoicesByDefault?: boolean;
   includeStampOnInvoicesByDefault?: boolean;
+  includeCashPaidStampByDefault?: boolean; // Apposer automatiquement le Cachet PAYÉ CASH sur les règlements en espèces
+
+  // Direct Printing & Automatic PDF Backup
+  pdfExportPath?: string; // e.g. 'C:\\hibtech'
+  autoDownloadPdfOnPrint?: boolean; // Auto download PDF immediately when clicking Imprimer
+  autoCloseModalOnPrint?: boolean; // Auto close the print window immediately after print
 }
 
 // ----------------------------------------------------
@@ -306,6 +333,15 @@ export interface StarlinkSpecifics {
   gpsCoordinates?: string;
   obstructionPercentage?: number;
   averageLatencyMs?: number;
+  
+  // Supervision & Télémétrie Starlink
+  linkStatus?: 'ONLINE' | 'DEGRADED' | 'OFFLINE';
+  dataUsageGB?: number;       // ex: 420 (GB consommés)
+  dataLimitGB?: number;       // ex: 1000 (Forfait 1TB)
+  billingCycleRenewalDate?: string; // ex: '2026-11-05'
+  downloadSpeedMbps?: number; // ex: 185
+  uploadSpeedMbps?: number;   // ex: 28
+  lastPingTime?: string;
 }
 
 export interface CctvCameraSpecifics {
@@ -412,8 +448,182 @@ export interface NetworkEquipment {
 }
 
 // ----------------------------------------------------
+// 1. GESTION DES BONS DE LIVRAISON (BL) & DÉCHARGES
+// ----------------------------------------------------
+
+export type DeliveryStatus = 'PENDING' | 'IN_TRANSIT' | 'DELIVERED' | 'CANCELLED';
+
+export interface DeliveryItem {
+  id: string;
+  name: string;
+  serialNumber?: string;
+  quantity: number;
+  accessories?: string[];
+  condition: 'NEUF_SOUS_BLISTER' | 'TESTE_ET_FONCTIONNEL' | 'OCCASION_REVISEE';
+}
+
+export interface DeliveryNote {
+  id: string;
+  deliveryNumber: string; // ex: BL-2026-0042
+  saleId?: string; // Liaison optionnelle avec une vente/facture
+  saleNumber?: string;
+  clientId: string;
+  clientName: string;
+  clientPhone: string;
+  deliveryAddress: string;
+  siteName?: string;
+  date: string;
+  status: DeliveryStatus;
+  transporterName: string;
+  transporterPhone?: string;
+  vehiclePlate?: string;
+  items: DeliveryItem[];
+  recipientName?: string;
+  recipientTitle?: string;
+  deliveredAt?: string;
+  dischargeNotes?: string;
+  signedByClient: boolean;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ----------------------------------------------------
+// 2. ORDRES DE MISSION & FICHES D'INTERVENTION TERRAIN
+// ----------------------------------------------------
+
+export type WorkOrderStatus = 'SCHEDULED' | 'IN_PROGRESS' | 'COMPLETED' | 'VALIDATED' | 'CANCELLED';
+
+export type WorkOrderType = 
+  | 'INSTALLATION_STARLINK' 
+  | 'INSTALLATION_CCTV' 
+  | 'CABLING_NETWORK' 
+  | 'ROUTER_WIFI_CONFIG' 
+  | 'MAINTENANCE_PREVENTIVE' 
+  | 'MAINTENANCE_CURATIVE_SAV';
+
+export interface WorkOrderTechnicalDetails {
+  // Starlink
+  starlinkKitNumber?: string;
+  azimuthElevationAngle?: string;
+  obstructionPercentage?: number;
+  latencyMs?: number;
+  downloadSpeedMbps?: number;
+  uploadSpeedMbps?: number;
+  // Network & IP
+  ipWan?: string;
+  ipLanGateway?: string;
+  dnsServers?: string;
+  // WiFi
+  wifiSsid?: string;
+  wifiPassword?: string;
+  frequencyBand?: string;
+  // CCTV & NVR
+  camerasCountInstalled?: number;
+  nvrModel?: string;
+  nvrIpAddress?: string;
+  cloudP2pStatus?: 'CONNECTED' | 'OFFLINE';
+}
+
+export interface WorkOrder {
+  id: string;
+  orderNumber: string; // ex: OM-2026-0018
+  type: WorkOrderType;
+  title: string;
+  clientId: string;
+  clientName: string;
+  clientPhone: string;
+  siteName: string;
+  siteAddress: string;
+  scheduledDate: string;
+  completedDate?: string;
+  status: WorkOrderStatus;
+  assignedTechnicians: string[];
+  priority: 'NORMAL' | 'URGENT' | 'CRITICAL';
+  technicalDetails: WorkOrderTechnicalDetails;
+  tasksPerformed: string[];
+  materialsUsed?: { name: string; quantity: number }[];
+  clientFeedback?: 'EXCELLENT' | 'SATISFAIT' | 'RESERVES';
+  clientFeedbackNotes?: string;
+  technicianNotes?: string;
+  signedByClient: boolean;
+  clientSignatureBase64?: string; // Signature tactile capturée au doigt/stylet
+  signedByTechnician: boolean;
+  technicianSignatureBase64?: string; // Signature technicien
+  photos?: {
+    id: string;
+    url: string; // Base64 data URL ou URL d'image
+    stage: 'BEFORE' | 'DURING' | 'AFTER';
+    caption: string;
+    timestamp: string;
+  }[];
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ----------------------------------------------------
+// 3. GESTION DES ABONNEMENTS & CONTRATS DE MAINTENANCE SAV
+// ----------------------------------------------------
+
+export type SubscriptionType = 
+  | 'STARLINK_SERVICE' 
+  | 'IT_MAINTENANCE' 
+  | 'CCTV_SURVEILLANCE_MAINTENANCE' 
+  | 'NETWORK_SLA';
+
+export type BillingCycle = 'MONTHLY' | 'QUARTERLY' | 'SEMI_ANNUAL' | 'ANNUAL';
+
+export type SubscriptionStatus = 'ACTIVE' | 'PENDING_RENEWAL' | 'OVERDUE' | 'SUSPENDED' | 'CANCELLED';
+
+export interface SubscriptionContract {
+  id: string;
+  contractNumber: string; // ex: SUB-2026-0105
+  type: SubscriptionType;
+  title: string;
+  clientId: string;
+  clientName: string;
+  clientPhone: string;
+  clientEmail?: string;
+  equipmentId?: string;
+  equipmentSerialNumber?: string;
+  billingCycle: BillingCycle;
+  priceUSD: number;
+  priceCDF: number;
+  startDate: string;
+  nextBillingDate: string;
+  expirationDate: string;
+  status: SubscriptionStatus;
+  planName?: string;
+  accountIdentifier?: string;
+  coverageDetails?: string;
+  autoRenew: boolean;
+  lastInvoicedDate?: string;
+  lastInvoiceNumber?: string;
+  notes?: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+// ----------------------------------------------------
 // GESTION DE CAISSE, AUTORISATION & CLÔTURE DE VENTE
 // ----------------------------------------------------
+
+export interface CashBilletageUSD {
+  b100: number; // Billets de $100
+  b50: number;  // Billets de $50
+  b20: number;  // Billets de $20
+  b10: number;  // Billets de $10
+  b5: number;   // Billets de $5
+  b1: number;   // Billets de $1
+}
+
+export interface CashBilletageCDF {
+  b20000: number; // Billets de 20 000 FC
+  b10000: number; // Billets de 10 000 FC
+  b5000: number;  // Billets de 5 000 FC
+  b1000: number;  // Billets de 1 000 FC
+  b500: number;   // Billets de 500 FC
+}
 
 export interface CashRegisterSession {
   id: string;
@@ -424,12 +634,17 @@ export interface CashRegisterSession {
   openedAt: string;
   closedAt?: string;
   status: 'OPEN' | 'CLOSED';
+  reportType?: 'Z' | 'X'; // Z = Clôture définitive, X = Contrôle provisoire
   openingFloatUSD: number;
   openingFloatCDF: number;
   closingCountedUSD?: number;
   closingCountedCDF?: number;
   closingNotes?: string;
   
+  // Billetage physique détaillé des coupures
+  billetageUSD?: CashBilletageUSD;
+  billetageCDF?: CashBilletageCDF;
+
   // Computed totals for reporting (Rapport Z Journalier)
   totalSalesUSD?: number;
   totalSalesCDF?: number;
@@ -445,5 +660,125 @@ export interface CashRegisterSession {
   differenceUSD?: number;
   differenceCDF?: number;
   totalTransactionsCount?: number;
+}
+
+// ----------------------------------------------------
+// APPROVISIONNEMENTS, ACHATS & MOUVEMENTS DE STOCKS
+// ----------------------------------------------------
+
+export type StockMovementType = 'PURCHASE' | 'SALE' | 'ADJUSTMENT' | 'RETURN';
+
+export interface StockMovement {
+  id: string;
+  productId: string;
+  productName: string;
+  productCode: string;
+  type: StockMovementType;
+  quantityChange: number; // positif pour entrée, négatif pour sortie
+  previousStock: number;
+  newStock: number;
+  unitCostUSD?: number;
+  referenceDoc?: string; // N° BL ou N° Vente
+  supplierName?: string;
+  operatorName: string;
+  date: string;
+  notes?: string;
+}
+
+export interface StockPurchaseItem {
+  productId: string;
+  productName: string;
+  productCode: string;
+  quantity: number;
+  unitCostUSD: number;
+  totalCostUSD: number;
+}
+
+export interface StockPurchase {
+  id: string;
+  purchaseNumber: string;
+  date: string;
+  supplierName: string;
+  supplierPhone?: string;
+  blReference?: string;
+  items: StockPurchaseItem[];
+  totalUSD: number;
+  totalCDF: number;
+  paymentMethod: PaymentMethod;
+  recordedBy: string;
+  notes?: string;
+}
+
+// ----------------------------------------------------
+// AUDIT TRAIL & TRAÇABILITÉ DES ACTIONS SENSIBLES
+// ----------------------------------------------------
+
+export type AuditActionType =
+  | 'PRICE_CHANGE'
+  | 'HIGH_DISCOUNT'
+  | 'SALE_DELETE'
+  | 'EXCHANGE_RATE_CHANGE'
+  | 'STOCK_ADJUSTMENT'
+  | 'STOCK_PURCHASE'
+  | 'CLIENT_DELETE'
+  | 'USER_ROLE_CHANGE'
+  | 'SESSION_DELETE'
+  | 'INVOICE_REPRINT'
+  | 'DATA_WIPE'
+  | 'ACCOUNTING_ENTRY';
+
+export interface AuditLogEntry {
+  id: string;
+  timestamp: string;
+  userName: string;
+  userRole: string;
+  action: AuditActionType;
+  title: string;
+  details: string;
+  severity: 'INFO' | 'WARNING' | 'CRITICAL';
+}
+
+export interface WipeDataOptions {
+  sales?: boolean;
+  cashSessions?: boolean;
+  expenses?: boolean;
+  clients?: boolean;
+  products?: boolean;
+  equipments?: boolean;
+  auditLogs?: boolean;
+  resetAll?: boolean;
+}
+
+// ----------------------------------------------------------------------------
+// COMPTABILITÉ SYSCOHADA (RDC)
+// ----------------------------------------------------------------------------
+export type SyscohadaJournalCode = 'VT' | 'CA' | 'ACH' | 'OD' | 'BQ';
+
+export interface AccountingEntry {
+  id: string;
+  date: string;
+  journal: SyscohadaJournalCode;
+  journalLabel: string;
+  pieceRef: string;
+  accountNumber: string;
+  accountLabel: string;
+  description: string;
+  debitUSD: number;
+  creditUSD: number;
+  debitCDF: number;
+  creditCDF: number;
+  exchangeRate: number;
+  sourceType: 'SALE' | 'PAYMENT' | 'EXPENSE' | 'MANUAL_OD';
+  sourceId?: string;
+  isCustom?: boolean;
+  createdAt: string;
+}
+
+export interface SyscohadaAccount {
+  accountNumber: string;
+  accountClass: number; // 1 to 7
+  label: string;
+  category: 'BILAN_ACTIF' | 'BILAN_PASSIF' | 'CHARGE' | 'PRODUIT';
+  description?: string;
 }
 

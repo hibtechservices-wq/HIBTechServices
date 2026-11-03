@@ -92,8 +92,8 @@ export function downloadExcelTemplate(
           Telephone: '+243 812 345 678',
           WhatsApp: '+243 812 345 678',
           Email: 'pmukendi@gmail.com',
-          Ville: 'Kinshasa',
-          Commune_Quartier: 'Gombe',
+          Ville: '',
+          Commune_Quartier: '',
           Adresse: '45 Boulevard du 30 Juin',
           NIF_ou_RCCM: '',
           Solde_Dette_USD: 0.0,
@@ -110,7 +110,7 @@ export function downloadExcelTemplate(
           Montant_USD: 160.0,
           Date: new Date().toISOString().slice(0, 10),
           Mode_Paiement: 'CASH_USD', // CASH_USD, CASH_CDF, MPESA, ORANGE_MONEY, AIRTEL_MONEY, AFRIMONEY, BANK_TRANSFER
-          Beneficiaire: 'Station TotalEnergies Gombe',
+          Beneficiaire: 'Station TotalEnergies',
           Reference_Piece: 'BL-98442',
         },
         {
@@ -271,7 +271,7 @@ export function mapRowsToClients(rows: any[]): Partial<Client>[] {
     const phone = (obj.telephone || obj.phone || obj.tel || '+243').toString().trim();
     const whatsapp = (obj.whatsapp || phone).toString().trim();
     const email = (obj.email || obj.courriel || '').toString().trim();
-    const city = obj.ville || obj.city || 'Kinshasa';
+    const city = obj.ville || obj.city || 'Lubumbashi';
     const commune = obj.communequartier || obj.commune || obj.quartier || '';
     const address = obj.adresse || obj.address || '';
     const rccmOrNif = obj.nifourccm || obj.nif || obj.rccm || '';

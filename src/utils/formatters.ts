@@ -22,15 +22,18 @@ export function formatMoney(amount: number, currency: Currency = 'USD', exchange
   }
 }
 
-export function formatDualCurrency(amountUSD: number, exchangeRate: number): { usd: string; cdf: string } {
+export function formatDualCurrency(amountUSD: number | string | undefined | null, exchangeRate: number | string | undefined | null = 2850): { usd: string; cdf: string } {
+  const safeAmount = typeof amountUSD === 'number' && !isNaN(amountUSD) ? amountUSD : Number(amountUSD) || 0;
+  const safeRate = typeof exchangeRate === 'number' && !isNaN(exchangeRate) && exchangeRate > 0 ? exchangeRate : Number(exchangeRate) || 2850;
+
   const usdFormatted = new Intl.NumberFormat('fr-FR', {
     style: 'currency',
     currency: 'USD',
     minimumFractionDigits: 2,
     maximumFractionDigits: 2,
-  }).format(amountUSD).replace('US$', '$');
+  }).format(safeAmount).replace('US$', '$');
 
-  const cdfValue = Math.round(amountUSD * exchangeRate);
+  const cdfValue = Math.round(safeAmount * safeRate);
   const cdfFormatted = new Intl.NumberFormat('fr-FR', {
     minimumFractionDigits: 0,
     maximumFractionDigits: 0,
@@ -203,13 +206,14 @@ export function generateWhatsAppReceiptMessage(
   company: CompanySettings
 ): string {
   const isPaid = sale.paymentStatus === 'PAID';
+  const docTypeLabel = sale.type === 'QUOTE_PROFORMA' ? 'Devis Proforma' : sale.type === 'RECEIPT' ? 'Reçu de Paiement' : 'Facture Normalisée';
   let text = `Bonjour *${sale.clientName}*,\n\n`;
-  text += `Voici le récapitulatif de votre Facture Normalisée DGI émise par *${company.name}* :\n`;
-  text += `🧾 *Facture N° :* ${sale.saleNumber}\n`;
-  text += `🏛️ *NFU DGI :* ${sale.dgiNfu}\n`;
+  text += `Veuillez trouver ci-joint votre document au format *PDF* : *${docTypeLabel} N° ${sale.saleNumber}* émise par *${company.name}* (NIF : ${company.nif}).\n\n`;
+  text += `🧾 *Document :* ${docTypeLabel} ${sale.saleNumber}\n`;
+  text += `🏛️ *NFU DGI :* ${sale.dgiNfu || 'SFN-00000'}\n`;
   text += `🔒 *Code Sécurité DEF :* ${sale.dgiSecurityCode}\n`;
   text += `📅 *Date :* ${formatDateTime(sale.createdAt)}\n\n`;
-  text += `🛒 *Articles & Prestations :*\n`;
+  text += `🛒 *Détail des lignes :*\n`;
   
   sale.items.forEach(item => {
     text += `• [Gr.${item.taxGroup}] ${item.name} (${item.quantity} ${item.unit}) : $${item.subtotalUSD.toFixed(2)}\n`;
@@ -224,11 +228,33 @@ export function generateWhatsAppReceiptMessage(
   if (!isPaid) {
     text += `⚠️ *Reste à payer :* $${sale.remainingDebtUSD.toFixed(2)}\n`;
   } else {
-    text += `✅ *Statut : PAYÉ INTÉGRALEMENT (Facture Normalisée DGI Validée)*\n`;
+    text += `✅ *Statut : PAYÉ INTÉGRALEMENT (Quittance & Facture Validée)*\n`;
   }
 
-  text += `\nMerci pour votre confiance !\n*${company.name}*\nNIF : ${company.nif} | RCCM : ${company.rccm}\n${company.address}, ${company.city}\n📞 ${company.phone1}`;
+  text += `\n📄 *Le fichier PDF complet avec jauge de règlement et QR code fiscal vous a été transmis en pièce jointe.*\n`;
+  text += `\nMerci pour votre confiance !\n*${company.name}*\n${company.address}, ${company.city}\n📞 ${company.phone1}`;
   return text;
+}
+
+/**
+ * Message pré-rédigé pour l'envoi direct de facture par WhatsApp Web
+ * Conforme à la demande utilisateur avec mention explicite du document PDF :
+ */
+export function generateDirectWhatsAppInvoiceMessage(
+  sale: Sale,
+  company: CompanySettings,
+  rateUSD_CDF?: number
+): string {
+  const clientName = sale.clientName || 'Client';
+  const invoiceNumber = sale.saleNumber;
+  const docTypeLabel = sale.type === 'QUOTE_PROFORMA' ? 'devis' : 'facture';
+  const amountUSD = sale.totalUSD.toFixed(2);
+  const rate = rateUSD_CDF || company.exchangeRateUSD_CDF || 2850;
+  const amountCDF = new Intl.NumberFormat('fr-FR').format(sale.totalCDF || Math.round(sale.totalUSD * rate));
+  const mpesaNumber = company.mpesaNumber || company.phone1 || '0810000000';
+  const companyName = company.name || 'Notre Entreprise';
+
+  return `Bonjour ${clientName}, veuillez trouver ci-joint votre document au format PDF : ${docTypeLabel} N° ${invoiceNumber} d'un montant de ${amountUSD} $ USD (${amountCDF} CDF). Pour vos règlements Mobile Money : M-Pesa au ${mpesaNumber}. Cordialement, ${companyName}.`;
 }
 
 export function exportToCSV(filename: string, rows: object[]) {

@@ -29,7 +29,7 @@ export const UserSwitchModal: React.FC = () => {
   const handlePinSubmit = (e: React.FormEvent) => {
     e.preventDefault();
     setErrorMessage('');
-    const res = switchUserByPin(enteredPin);
+    const res = switchUserByPin(enteredPin, selectedUserForPin || undefined);
     if (res.success) {
       setIsUserSwitchModalOpen(false);
       setEnteredPin('');
@@ -46,7 +46,7 @@ export const UserSwitchModal: React.FC = () => {
       setEnteredPin(nextPin);
       if (nextPin.length === 4) {
         // Auto submit on 4 digits
-        const res = switchUserByPin(nextPin);
+        const res = switchUserByPin(nextPin, selectedUserForPin || undefined);
         if (res.success) {
           setIsUserSwitchModalOpen(false);
           setEnteredPin('');
@@ -86,7 +86,7 @@ export const UserSwitchModal: React.FC = () => {
         </div>
 
         {/* Body */}
-        <div className="p-6 space-y-4">
+        <div className="p-4 sm:p-6 space-y-4">
           <p className="text-xs text-neutral-600 text-center">
             Sélectionnez votre profil ou composez votre <strong>Code PIN à 4 chiffres</strong> pour déverrouiller votre session de travail.
           </p>
@@ -115,8 +115,9 @@ export const UserSwitchModal: React.FC = () => {
                       {roleInfo.label.split('/')[0]}
                     </span>
                   </div>
-                  <span className="text-[9px] font-mono-nums text-neutral-400 mt-2 block">
-                    PIN Démo: <span className="font-bold text-neutral-700">{u.pinCode}</span>
+                  <span className="text-[9px] text-neutral-500 mt-2 flex items-center gap-1 font-medium">
+                    <Lock className="w-2.5 h-2.5 text-neutral-400 shrink-0" />
+                    <span>Code PIN requis</span>
                   </span>
                 </button>
               );

@@ -252,7 +252,7 @@ export const EquipmentModal: React.FC<EquipmentModalProps> = ({
       setType(defaultType);
       setClientId(clients[0]?.id || '');
       setSiteName('Site Principal');
-      setSiteAddress(clients[0]?.address || 'Kinshasa, RDC');
+      setSiteAddress(clients[0]?.address || 'Lubumbashi, RDC');
       setSerialNumber(`SN-${Date.now().toString().slice(-6)}`);
       setMacAddress('');
       setStatus('ACTIVE');
@@ -274,7 +274,7 @@ export const EquipmentModal: React.FC<EquipmentModalProps> = ({
       setSlRouterModel('Starlink Gen 3 WiFi 6');
       setSlSsid(`Starlink_${clients[0]?.name.replace(/\s+/g, '_') || 'Guest'}`);
       setSlPassword('Starlink#SecurePass2024!');
-      setSlGps('-4.3317, 15.3139 (Kinshasa)');
+      setSlGps('-11.6609, 27.4794 (Lubumbashi)');
       setSlLatency(45);
     }
   }, [equipmentToEdit, defaultType, clients]);
@@ -400,7 +400,7 @@ export const EquipmentModal: React.FC<EquipmentModalProps> = ({
       clientId: clientId || clients[0]?.id || 'comptoir',
       clientName: selectedClient ? selectedClient.name : 'Client Comptoir',
       siteName: siteName || 'Site Principal',
-      siteAddress: siteAddress || selectedClient?.address || 'Kinshasa, RDC',
+      siteAddress: siteAddress || selectedClient?.address || 'Lubumbashi, RDC',
       serialNumber: serialNumber || `SN-${Date.now()}`,
       macAddress,
       status,
@@ -557,7 +557,7 @@ export const EquipmentModal: React.FC<EquipmentModalProps> = ({
                   type="text"
                   value={siteName}
                   onChange={(e) => setSiteName(e.target.value)}
-                  placeholder="Ex: Siège Gombe / Datacenter RDC"
+                  placeholder="Ex: Siège Principal / Datacenter RDC"
                   className="w-full bg-white border border-neutral-300 rounded-lg px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
                   required
                 />
@@ -571,7 +571,7 @@ export const EquipmentModal: React.FC<EquipmentModalProps> = ({
                   type="text"
                   value={siteAddress}
                   onChange={(e) => setSiteAddress(e.target.value)}
-                  placeholder="Ex: Boulevard du 30 Juin, Gombe, Kinshasa"
+                  placeholder="Ex: Boulevard du 30 Juin, RDC"
                   className="w-full bg-white border border-neutral-300 rounded-lg px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:ring-1 focus:ring-neutral-900"
                 />
               </div>

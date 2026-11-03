@@ -235,7 +235,7 @@ export const UsersView: React.FC = () => {
                 <th className="py-3.5 px-4">Utilisateur & Contact</th>
                 <th className="py-3.5 px-4">Rôle & Profil</th>
                 <th className="py-3.5 px-4">Affectation / Caisse</th>
-                <th className="py-3.5 px-4">Code PIN Caisse</th>
+                <th className="py-3.5 px-4">Code PIN & Pass Réimpr</th>
                 <th className="py-3.5 px-4 text-center">Statut</th>
                 <th className="py-3.5 px-4 text-right">Actions</th>
               </tr>
@@ -306,24 +306,42 @@ export const UsersView: React.FC = () => {
                       </div>
                     </td>
 
-                    {/* PIN Code */}
+                    {/* PIN Code & Reprint Password */}
                     <td className="py-4 px-4">
-                      <div className="flex items-center gap-1.5 font-mono-nums">
-                        <span className="font-bold text-xs bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">
-                          {isPinVisible ? user.pinCode : '••••'}
-                        </span>
-                        <button
-                          type="button"
-                          onClick={() => togglePinVisibility(user.id)}
-                          className="p-1 text-neutral-400 hover:text-neutral-700 rounded transition-colors"
-                          title={isPinVisible ? 'Masquer le code PIN' : 'Afficher le code PIN'}
-                        >
-                          {isPinVisible ? (
-                            <EyeOff className="w-3.5 h-3.5" />
+                      <div className="space-y-1">
+                        <div className="flex items-center gap-1.5 font-mono-nums">
+                          <span className="text-[10px] text-neutral-400 font-sans">PIN :</span>
+                          <span className="font-bold text-xs bg-neutral-100 px-2 py-0.5 rounded border border-neutral-200">
+                            {isPinVisible ? user.pinCode : '••••'}
+                          </span>
+                          <button
+                            type="button"
+                            onClick={() => togglePinVisibility(user.id)}
+                            className="p-1 text-neutral-400 hover:text-neutral-700 rounded transition-colors"
+                            title={isPinVisible ? 'Masquer' : 'Afficher'}
+                          >
+                            {isPinVisible ? (
+                              <EyeOff className="w-3.5 h-3.5" />
+                            ) : (
+                              <Eye className="w-3.5 h-3.5" />
+                            )}
+                          </button>
+                        </div>
+                        <div className="flex items-center gap-1 text-[10px]">
+                          {user.reprintPassword ? (
+                            <span
+                              className="inline-flex items-center gap-1 px-1.5 py-0.5 rounded bg-amber-50 text-amber-900 border border-amber-200 font-mono font-semibold"
+                              title="Mot de passe réimpression configuré dans Utilisateurs & Droits"
+                            >
+                              <Lock className="w-2.5 h-2.5 text-amber-600" />
+                              <span>Réimpr: {isPinVisible ? user.reprintPassword : '••••'}</span>
+                            </span>
                           ) : (
-                            <Eye className="w-3.5 h-3.5" />
+                            <span className="text-neutral-400 italic text-[10px]">
+                              Pass réimpr non défini
+                            </span>
                           )}
-                        </button>
+                        </div>
                       </div>
                     </td>
 

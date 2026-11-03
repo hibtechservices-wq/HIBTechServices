@@ -1,6 +1,5 @@
 import React from 'react';
 import { useApp } from '../../context/AppContext';
-import { getRoleBadgeInfo } from '../../data/initialUsers';
 import {
   Store,
   FileText,
@@ -14,7 +13,13 @@ import {
   KeyRound,
   LogOut,
   Radio,
+  CreditCard,
+  X,
+  Trash2,
+  Globe,
+  BookOpen,
 } from 'lucide-react';
+import { PWAInstallButton } from '../pwa/PWAInstallButton';
 
 export const Sidebar: React.FC = () => {
   const {
@@ -25,195 +30,320 @@ export const Sidebar: React.FC = () => {
     exportDatabaseJSON,
     users,
     equipments,
-    currentUser,
+    subscriptions,
     setIsUserSwitchModalOpen,
     logout,
     currentCashSession,
+    isMobileNavOpen,
+    setIsMobileNavOpen,
+    setIsDataWipeModalOpen,
   } = useApp();
 
-  const currentRoleInfo = getRoleBadgeInfo(currentUser.role);
+  const subAlertCount = (subscriptions || []).filter((s) => {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    const due = new Date(s.nextBillingDate);
+    due.setHours(0, 0, 0, 0);
+    const diff = Math.ceil((due.getTime() - today.getTime()) / (1000 * 60 * 60 * 24));
+    return s.status === 'OVERDUE' || diff <= 7;
+  }).length;
 
-  const navigationItems = [
+  const navigationSections = [
     {
-      id: 'pos',
-      label: 'Caisse Express (POS)',
-      icon: Store,
-      badge: null,
-      highlight: true,
+      title: 'Commerce & Caisse',
+      items: [
+        {
+          id: 'pos',
+          label: 'Caisse Express (POS)',
+          icon: Store,
+          badge: null,
+        },
+        {
+          id: 'caisse',
+          label: 'Session & Clôture (Z/X)',
+          icon: Receipt,
+          badge: currentCashSession ? 'Ouverte' : (metrics.unpaidInvoicesCount > 0 ? `${metrics.unpaidInvoicesCount} imp.` : null),
+          badgeType: currentCashSession ? 'success' : 'neutral',
+        },
+        {
+          id: 'invoices',
+          label: 'Factures & Devis',
+          icon: FileText,
+          badge: metrics.unpaidInvoicesCount > 0 ? `${metrics.unpaidInvoicesCount}` : null,
+          badgeType: 'warning',
+        },
+      ],
     },
     {
-      id: 'caisse',
-      label: 'Gestion de Caisse',
-      icon: Receipt,
-      badge: currentCashSession ? 'Active' : (metrics.unpaidInvoicesCount > 0 ? `${metrics.unpaidInvoicesCount} impayé(s)` : 'Fermée'),
-      badgeColor: currentCashSession ? 'text-emerald-700 bg-emerald-100 font-semibold' : 'text-neutral-600 bg-neutral-100',
+      title: 'Opérations & Terrains',
+      items: [
+        {
+          id: 'equipments',
+          label: 'Starlink & Réseaux',
+          icon: Radio,
+          badge: subAlertCount > 0 ? `${subAlertCount} alerte` : (equipments.length > 0 ? `${equipments.length}` : null),
+          badgeType: subAlertCount > 0 ? 'danger' : 'neutral',
+        },
+        {
+          id: 'clients',
+          label: 'Clients & Créances',
+          icon: Users,
+          badge: metrics.totalDebtsUSD > 0 ? `$${Math.round(metrics.totalDebtsUSD)}` : null,
+          badgeType: metrics.totalDebtsUSD > 0 ? 'danger' : 'neutral',
+        },
+        {
+          id: 'catalog',
+          label: 'Catalogue & Stocks',
+          icon: Package,
+          badge: metrics.lowStockCount > 0 ? `${metrics.lowStockCount} alerte` : null,
+          badgeType: metrics.lowStockCount > 0 ? 'warning' : 'neutral',
+        },
+      ],
     },
     {
-      id: 'dgi',
-      label: 'Conformité DGI & TVA',
-      icon: ShieldCheck,
-      badge: 'DEF RDC',
-      badgeColor: 'text-emerald-700 bg-emerald-100 font-mono',
+      title: 'Finances & Contrôle',
+      items: [
+        {
+          id: 'dgi',
+          label: 'Conformité DGI & TVA',
+          icon: ShieldCheck,
+          badge: 'DEF RDC',
+          badgeType: 'success',
+        },
+        {
+          id: 'accounting',
+          label: 'Comptabilité (SYSCOHADA)',
+          icon: BookOpen,
+          badge: 'OHADA',
+          badgeType: 'indigo',
+        },
+        {
+          id: 'expenses',
+          label: 'Dépenses & Trésorerie',
+          icon: CreditCard,
+          badge: null,
+        },
+        {
+          id: 'users',
+          label: 'Utilisateurs & Droits',
+          icon: UserCheck,
+          badge: `${users.length}`,
+          badgeType: 'neutral',
+        },
+        {
+          id: 'settings',
+          label: 'Paramètres du Système',
+          icon: Settings,
+          badge: null,
+        },
+      ],
     },
     {
-      id: 'clients',
-      label: 'Clients & Créances',
-      icon: Users,
-      badge: metrics.totalDebtsUSD > 0 ? `$${Math.round(metrics.totalDebtsUSD)}` : null,
-      badgeColor: 'text-rose-700 bg-rose-100',
-    },
-    {
-      id: 'catalog',
-      label: 'Catalogue & Stocks',
-      icon: Package,
-      badge: metrics.lowStockCount > 0 ? `${metrics.lowStockCount} alerte` : null,
-      badgeColor: 'text-amber-700 bg-amber-100',
-    },
-    {
-      id: 'equipments',
-      label: 'Parc & Réseaux',
-      icon: Radio,
-      badge: equipments.length > 0 ? `${equipments.length}` : null,
-      badgeColor: 'text-sky-700 bg-sky-100 font-mono-nums',
-    },
-    {
-      id: 'expenses',
-      label: 'Dépenses & Charges',
-      icon: Receipt,
-      badge: null,
-    },
-    {
-      id: 'users',
-      label: 'Utilisateurs & Droits',
-      icon: UserCheck,
-      badge: `${users.length}`,
-      badgeColor: 'text-purple-700 bg-purple-100 font-mono-nums',
-    },
-    {
-      id: 'settings',
-      label: 'Paramètres & Taux',
-      icon: Settings,
-      badge: null,
+      title: 'Espace B2B',
+      items: [
+        {
+          id: 'portal',
+          label: 'Portail Client B2B',
+          icon: Globe,
+          badge: 'En ligne',
+          badgeType: 'success',
+        },
+      ],
     },
   ];
 
-  return (
-    <aside className="no-print w-64 border-r border-neutral-200 bg-white flex flex-col justify-between shrink-0 min-h-[calc(100vh-4rem)]">
+  const getBadgeClass = (type?: string, isActive = false) => {
+    if (isActive) return 'text-amber-300 font-mono text-[11px]';
+    switch (type) {
+      case 'danger':
+        return 'text-rose-600 font-mono font-medium text-[11px]';
+      case 'warning':
+        return 'text-amber-600 font-mono font-medium text-[11px]';
+      case 'success':
+        return 'text-emerald-600 font-mono font-semibold text-[11px]';
+      case 'indigo':
+        return 'text-indigo-600 font-mono font-semibold text-[11px]';
+      default:
+        return 'text-slate-400 font-mono text-[11px]';
+    }
+  };
+
+  const renderNavContent = (isMobile = false) => (
+    <>
       {/* Navigation List */}
-      <div className="p-3 space-y-1">
-        <div className="px-3 py-2 text-[11px] font-semibold text-neutral-500 uppercase tracking-wider">
-          Menu Principal
-        </div>
+      <div className="p-3 space-y-5">
+        {navigationSections.map((section, sIdx) => (
+          <div key={sIdx} className="space-y-1">
+            <div className="px-3 py-1 text-[11px] font-bold text-slate-400 uppercase tracking-wider flex items-center justify-between">
+              <span>{section.title}</span>
+              {isMobile && sIdx === 0 && (
+                <span className="text-[11px] text-emerald-600 font-semibold">{settings.name}</span>
+              )}
+            </div>
 
-        <nav className="space-y-1">
-          {navigationItems.map((item) => {
-            const Icon = item.icon;
-            const isActive = activeTab === item.id;
-            return (
-              <button
-                key={item.id}
-                onClick={() => setActiveTab(item.id)}
-                className={`w-full flex items-center justify-between px-3 py-2.5 rounded-lg text-xs font-medium transition-colors text-left ${
-                  isActive
-                    ? 'bg-neutral-900 text-white font-semibold shadow-2xs'
-                    : 'text-neutral-700 hover:bg-neutral-100 hover:text-neutral-900'
-                }`}
-              >
-                <div className="flex items-center gap-2.5">
-                  <Icon
-                    className={`w-4 h-4 ${
+            <nav className="space-y-0.5">
+              {section.items.map((item) => {
+                const Icon = item.icon;
+                const isActive = activeTab === item.id;
+                return (
+                  <button
+                    key={item.id}
+                    onClick={() => {
+                      setActiveTab(item.id);
+                      if (isMobile) setIsMobileNavOpen(false);
+                    }}
+                    className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-medium transition-all text-left min-h-[38px] cursor-pointer group ${
                       isActive
-                        ? 'text-amber-400'
-                        : item.id === 'dgi'
-                        ? 'text-emerald-600'
-                        : item.id === 'users'
-                        ? 'text-purple-600'
-                        : item.highlight
-                        ? 'text-emerald-600'
-                        : 'text-neutral-500'
-                    }`}
-                  />
-                  <span>{item.label}</span>
-                </div>
-
-                {item.badge && (
-                  <span
-                    className={`text-[10px] font-mono-nums px-1.5 py-0.5 rounded font-semibold ${
-                      isActive ? 'bg-neutral-800 text-amber-300' : item.badgeColor || 'bg-neutral-200 text-neutral-700'
+                        ? 'bg-slate-900 text-white font-semibold shadow-xs'
+                        : 'text-slate-600 hover:bg-slate-100 hover:text-slate-900'
                     }`}
                   >
-                    {item.badge}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </nav>
+                    <div className="flex items-center gap-2.5 min-w-0">
+                      <Icon
+                        className={`w-4 h-4 shrink-0 transition-colors ${
+                          isActive
+                            ? 'text-amber-400'
+                            : 'text-slate-400 group-hover:text-slate-700'
+                        }`}
+                      />
+                      <span className="truncate">{item.label}</span>
+                    </div>
+
+                    {item.badge && (
+                      <span className={`shrink-0 ml-1.5 ${getBadgeClass(item.badgeType, isActive)}`}>
+                        {item.badge}
+                      </span>
+                    )}
+                  </button>
+                );
+              })}
+            </nav>
+          </div>
+        ))}
 
         {/* DGI Fiscal Certification Box */}
-        <div className="pt-2 px-3">
-          <div className="p-3 bg-emerald-50/70 rounded-xl border border-emerald-200 text-[11px] text-emerald-900 space-y-1">
+        <div className="pt-1 px-3">
+          <div className="p-3 bg-emerald-50/60 rounded-xl border border-emerald-200/80 text-[11px] text-emerald-950 space-y-1">
             <div className="flex items-center justify-between font-bold">
-              <span className="flex items-center gap-1">
-                <ShieldCheck className="w-3.5 h-3.5 text-emerald-600" />
-                <span>Norme DGI RDC</span>
+              <span className="flex items-center gap-1.5">
+                <ShieldCheck className="w-4 h-4 text-emerald-600 shrink-0" />
+                <span className="text-emerald-900 font-semibold">Norme DGI RDC</span>
               </span>
-              <span className="text-[9px] bg-emerald-600 text-white px-1 py-0.2 rounded">DEF ACTIF</span>
+              <span className="text-[10px] text-emerald-700 font-mono font-bold tracking-tight">DEF ACTIF</span>
             </div>
-            <p className="text-[10px] text-emerald-800 leading-tight">
-              Facturation certifiée avec NFU, Sceau SHA-256 et QR Code DGI.
+            <p className="text-[11px] text-emerald-800/90 leading-tight">
+              Facturation certifiée · QR Code & Sceau DGI conforme.
             </p>
           </div>
         </div>
       </div>
 
-      {/* Bottom Profile & Active Session Info */}
-      <div className="p-3 border-t border-neutral-200 bg-neutral-50/70 space-y-2">
-        <div className="p-2 bg-white rounded-xl border border-neutral-200 shadow-2xs space-y-2">
-          <div className="flex items-center justify-between">
-            <div className="flex items-center gap-2 truncate">
-              <div className="w-7 h-7 rounded-lg bg-neutral-900 text-amber-400 font-bold text-xs flex items-center justify-center shrink-0">
-                {currentUser.name.charAt(0)}
+      {/* Bottom Footer Actions */}
+      <div className="p-3 border-t border-slate-100 bg-slate-50/50 space-y-2">
+        {/* PWA Install / Download Button */}
+        <PWAInstallButton variant="sidebar" />
+
+        <div className="flex items-center justify-between px-2 text-[11px] text-slate-500 font-medium">
+          <span className="truncate max-w-[120px]">NIF: {settings.nif || 'A2109845B'}</span>
+          <div className="flex items-center gap-1">
+            <button
+              onClick={() => {
+                setIsUserSwitchModalOpen(true);
+                if (isMobile) setIsMobileNavOpen(false);
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+              title="Changer d'utilisateur / Code PIN"
+              aria-label="Changer d'utilisateur"
+            >
+              <KeyRound className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                logout();
+                if (isMobile) setIsMobileNavOpen(false);
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              title="Se déconnecter"
+              aria-label="Se déconnecter"
+            >
+              <LogOut className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={() => {
+                setIsDataWipeModalOpen(true);
+                if (isMobile) setIsMobileNavOpen(false);
+              }}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-rose-600 hover:bg-rose-50 transition-colors"
+              title="Réinitialiser les données"
+              aria-label="Réinitialiser les données"
+            >
+              <Trash2 className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={exportDatabaseJSON}
+              className="p-1.5 rounded-lg text-slate-400 hover:text-slate-800 hover:bg-slate-100 transition-colors"
+              title="Sauvegarde JSON de la base"
+              aria-label="Sauvegarde JSON"
+            >
+              <Database className="w-3.5 h-3.5" />
+            </button>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+
+  return (
+    <>
+      {/* 1. Desktop Persistent Sidebar */}
+      <aside className="no-print hidden lg:flex w-64 border-r border-slate-200/80 bg-white flex-col justify-between shrink-0 min-h-[calc(100vh-4rem)]">
+        {renderNavContent(false)}
+      </aside>
+
+      {/* 2. Mobile Off-Canvas Sliding Drawer */}
+      {isMobileNavOpen && (
+        <div className="no-print lg:hidden fixed inset-0 z-50 flex">
+          {/* Backdrop overlay */}
+          <div
+            className="fixed inset-0 bg-slate-950/60 backdrop-blur-xs animate-in fade-in duration-200"
+            onClick={() => setIsMobileNavOpen(false)}
+            aria-hidden="true"
+          />
+
+          {/* Drawer container */}
+          <div className="relative w-80 max-w-[85vw] bg-white h-full shadow-2xl flex flex-col justify-between overflow-y-auto z-10 animate-in slide-in-from-left duration-200">
+            {/* Drawer Header */}
+            <div className="p-4 border-b border-slate-800 flex items-center justify-between bg-slate-900 text-white">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-lg bg-slate-800 text-amber-400 flex items-center justify-center font-bold text-xs shadow-xs border border-slate-700">
+                  <span>CB</span>
+                </div>
+                <div>
+                  <span className="text-sm font-bold tracking-tight text-white block leading-tight">
+                    {settings.name}
+                  </span>
+                  <span className="text-[11px] text-slate-400">
+                    {settings.city || 'Lubumbashi'} · RDC
+                  </span>
+                </div>
               </div>
-              <div className="truncate">
-                <span className="block text-xs font-bold text-neutral-900 truncate">
-                  {currentUser.name}
-                </span>
-                <span className="block text-[10px] text-neutral-500 truncate">
-                  {currentRoleInfo.label.split('/')[0]}
-                </span>
-              </div>
+
+              <button
+                onClick={() => setIsMobileNavOpen(false)}
+                className="p-2 rounded-lg bg-slate-800 hover:bg-slate-700 text-slate-300 hover:text-white transition-colors"
+                aria-label="Fermer le menu"
+              >
+                <X className="w-5 h-5" />
+              </button>
             </div>
-            <div className="flex items-center gap-1 shrink-0">
-              <button
-                onClick={() => setIsUserSwitchModalOpen(true)}
-                className="p-1.5 text-neutral-500 hover:text-amber-600 hover:bg-amber-50 rounded-lg transition-colors"
-                title="Changer d'utilisateur / Saisir code PIN"
-              >
-                <KeyRound className="w-3.5 h-3.5" />
-              </button>
-              <button
-                onClick={logout}
-                className="p-1.5 text-neutral-500 hover:text-rose-600 hover:bg-rose-50 rounded-lg transition-colors"
-                title="Se déconnecter / Verrouiller la session"
-              >
-                <LogOut className="w-3.5 h-3.5" />
-              </button>
+
+            {/* Nav content */}
+            <div className="flex-1 overflow-y-auto flex flex-col justify-between">
+              {renderNavContent(true)}
             </div>
           </div>
         </div>
-
-        <div className="flex items-center justify-between px-2 text-[10px] text-neutral-500">
-          <span>NIF : {settings.nif || 'A2109845B'}</span>
-          <button
-            onClick={exportDatabaseJSON}
-            className="p-1 text-neutral-400 hover:text-neutral-900 rounded transition-colors"
-            title="Exporter une sauvegarde JSON"
-          >
-            <Database className="w-3.5 h-3.5" />
-          </button>
-        </div>
-      </div>
-    </aside>
+      )}
+    </>
   );
 };
