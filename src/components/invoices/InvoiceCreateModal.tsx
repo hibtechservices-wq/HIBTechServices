@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import { useApp } from '../../context/AppContext';
 import { DocumentType, PaymentMethod, SaleItem, FiscalTaxGroup } from '../../types';
 import { formatDualCurrency, getPaymentMethodLabel, getTaxGroupDetails } from '../../utils/formatters';
-import { Plus, Trash2, X, Check, FileText, ShieldCheck, HelpCircle, Ban, Percent } from 'lucide-react';
+import { Plus, Trash2, X, Check, FileText, ShieldCheck, HelpCircle, Ban, Percent, UserCheck } from 'lucide-react';
 import confetti from 'canvas-confetti';
 
 interface InvoiceCreateModalProps {
@@ -18,12 +18,16 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
   defaultType = 'INVOICE',
   defaultClientId,
 }) => {
-  const { clients, products, createSale, settings, setActivePrintSale } = useApp();
+  const { clients, products, createSale, settings, setActivePrintSale, users, currentUser } = useApp();
   const rate = settings.exchangeRateUSD_CDF || 2850;
 
   const [docType, setDocType] = useState<DocumentType>(defaultType);
   const [clientId, setClientId] = useState<string>(defaultClientId || (clients[0]?.id || ''));
   const [clientNif, setClientNif] = useState<string>(clients[0]?.nif || '');
+  const [cashierName, setCashierName] = useState<string>(() => {
+    const defaultCashier = users.find(u => u.role === 'CASHIER' && u.isActive);
+    return defaultCashier?.name || currentUser?.name || settings.cashierName || 'Rachel Mwamba (Caisse POS)';
+  });
   
   const [items, setItems] = useState<SaleItem[]>([
     {
@@ -206,6 +210,7 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
       type: docType,
       clientId,
       clientNif: clientNif.trim() || undefined,
+      cashierName: cashierName.trim() || undefined,
       items: finalItems,
       discountUSD,
       taxPercent,
@@ -262,7 +267,7 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
         {/* Form Body */}
         <form onSubmit={handleSubmit} className="p-6 overflow-y-auto space-y-6 flex-1 text-xs sm:text-sm">
           {/* Top Options Bar */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-200">
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 bg-neutral-50 p-4 rounded-xl border border-neutral-200">
             {/* Type Document */}
             <div>
               <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
@@ -318,7 +323,7 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
             {/* Client NIF for DGI compliance */}
             <div>
               <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5">
-                NIF Client (Obligatoire B2B DGI)
+                NIF Client (B2B DGI)
               </label>
               <input
                 type="text"
@@ -327,6 +332,31 @@ export const InvoiceCreateModal: React.FC<InvoiceCreateModalProps> = ({
                 placeholder="Ex: A1928374P ou NON-ASSUJETTI"
                 className="w-full bg-white border border-neutral-300 rounded-lg px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 font-mono-nums"
               />
+            </div>
+
+            {/* Caissier Autorisé à Facturer */}
+            <div>
+              <label className="block text-xs font-semibold text-neutral-700 uppercase tracking-wider mb-1.5 flex items-center justify-between">
+                <span className="flex items-center gap-1">
+                  <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                  <span>Caissier Autorisé</span>
+                </span>
+                <span className="text-[10px] text-neutral-400 font-normal">Facturier</span>
+              </label>
+              <select
+                value={cashierName}
+                onChange={(e) => setCashierName(e.target.value)}
+                className="w-full bg-white border border-neutral-300 rounded-lg px-3 py-2 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 font-semibold"
+              >
+                {users.map((u) => (
+                  <option key={u.id} value={u.name}>
+                    {u.name} [{u.role === 'CASHIER' ? 'Caissier' : u.role === 'SUPER_ADMIN' ? 'Gérant' : u.role === 'MANAGER' ? 'Superviseur' : 'Agent'}] {u.assignedRegister ? `· ${u.assignedRegister}` : ''}
+                  </option>
+                ))}
+                {!users.some(u => u.name === cashierName) && (
+                  <option value={cashierName}>{cashierName}</option>
+                )}
+              </select>
             </div>
           </div>
 

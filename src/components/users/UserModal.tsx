@@ -107,7 +107,7 @@ export const UserModal: React.FC<UserModalProps> = ({ isOpen, onClose, userToEdi
   const permissionLabels: { key: keyof UserPermissions; label: string; desc: string }[] = [
     { key: 'canAccessPOS', label: 'Accéder à la Caisse Express (POS)', desc: 'Effectuer des ventes rapides, encaisser et imprimer tickets' },
     { key: 'canReprintInvoices', label: 'Autoriser Réimpression Factures & Tickets POS', desc: 'Permet d\'autoriser la réimpression de tickets de caisse avec son mot de passe' },
-    { key: 'canCreateInvoices', label: 'Créer Factures & Devis Proforma', desc: 'Émettre des documents commerciaux' },
+    { key: 'canCreateInvoices', label: 'Autoriser ce caissier à Facturer (Factures & Devis)', desc: 'Donne l\'autorisation légale d\'émettre, signer et valider des factures et tickets' },
     { key: 'canDeleteInvoices', label: 'Supprimer / Annuler des Factures', desc: 'Autorisation critique avec réajustement de stock' },
     { key: 'canManageClients', label: 'Gérer les Clients & Créances', desc: 'Créer clients, relancer par WhatsApp et enregistrer règlements' },
     { key: 'canAccessDGI', label: 'Accéder au module DGI & TVA', desc: 'Télédéclarations fiscales et bordereau mensuel TVA' },

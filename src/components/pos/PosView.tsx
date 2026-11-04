@@ -34,6 +34,7 @@ import {
   Coins,
   Printer,
   Tag,
+  UserCheck,
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
 import { PosSalesChart } from './PosSalesChart';
@@ -59,7 +60,14 @@ export const PosView: React.FC = () => {
     settings,
     selectedCurrency,
     setActivePrintSale,
+    users,
+    currentUser,
   } = useApp();
+
+  const [selectedCashierName, setSelectedCashierName] = useState<string>(() => {
+    const defaultCashier = users.find(u => u.role === 'CASHIER' && u.isActive);
+    return defaultCashier?.name || currentUser?.name || settings.cashierName || 'Rachel Mwamba (Caisse POS)';
+  });
 
   const rate = settings.exchangeRateUSD_CDF || 2850;
 
@@ -344,6 +352,7 @@ export const PosView: React.FC = () => {
     const sale = createSale({
       type: 'RECEIPT',
       clientId: selectedClientId,
+      cashierName: selectedCashierName,
       items: validItems,
       discountUSD,
       taxPercent: cartTaxPercent,
@@ -1093,8 +1102,8 @@ export const PosView: React.FC = () => {
           {/* Cart Footer: Client, Mode, Totals & Action Buttons (Proforma & Checkout) */}
           {cart.length > 0 && (
             <div className="p-4 bg-neutral-50/90 border-t border-neutral-200 space-y-3.5">
-              {/* Row 1: Client Selector & Payment Method */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+              {/* Row 1: Client Selector, Mode de Règlement & Caissier Autorisé */}
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-2.5">
                 {/* Client Assign */}
                 <div>
                   <div className="flex items-center justify-between mb-1">
@@ -1114,7 +1123,7 @@ export const PosView: React.FC = () => {
                   <select
                     value={selectedClientId}
                     onChange={(e) => setSelectedClientId(e.target.value)}
-                    className="w-full bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900"
+                    className="w-full bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 truncate"
                   >
                     <option value="comptoir">Client Comptoir (Consommateur Final)</option>
                     {clients.map((c) => (
@@ -1133,7 +1142,7 @@ export const PosView: React.FC = () => {
                   <select
                     value={paymentMethod}
                     onChange={(e) => setPaymentMethod(e.target.value as PaymentMethod)}
-                    className="w-full bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900"
+                    className="w-full bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 truncate"
                   >
                     {paymentOptions.map((opt) => {
                       const info = getPaymentMethodLabel(opt);
@@ -1143,6 +1152,29 @@ export const PosView: React.FC = () => {
                         </option>
                       );
                     })}
+                  </select>
+                </div>
+
+                {/* Caissier Autorisé à facturer */}
+                <div>
+                  <label className="block text-[10px] font-bold text-neutral-600 uppercase tracking-wider mb-1 flex items-center gap-1">
+                    <UserCheck className="w-3 h-3 text-emerald-600" />
+                    <span>Caissier Facturier</span>
+                  </label>
+                  <select
+                    value={selectedCashierName}
+                    onChange={(e) => setSelectedCashierName(e.target.value)}
+                    className="w-full bg-white border border-neutral-300 rounded-lg px-2.5 py-1.5 text-xs text-neutral-900 focus:outline-none focus:border-neutral-900 font-semibold truncate"
+                    title="Sélectionner le caissier autorisé pour cette facture / encaissement"
+                  >
+                    {users.map((u) => (
+                      <option key={u.id} value={u.name}>
+                        {u.name} [{u.role === 'CASHIER' ? 'Caissier' : u.role === 'SUPER_ADMIN' ? 'Gérant' : u.role === 'MANAGER' ? 'Superviseur' : 'Agent'}]
+                      </option>
+                    ))}
+                    {!users.some(u => u.name === selectedCashierName) && (
+                      <option value={selectedCashierName}>{selectedCashierName}</option>
+                    )}
                   </select>
                 </div>
               </div>

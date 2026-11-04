@@ -120,6 +120,7 @@ interface AppContextType {
     clientPhone?: string;
     clientAddress?: string;
     clientNif?: string;
+    cashierName?: string;
     isNormalizedDGI?: boolean;
     dgiExemptionReason?: string;
   }) => Sale;
@@ -987,6 +988,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
     clientPhone?: string;
     clientAddress?: string;
     clientNif?: string;
+    cashierName?: string;
     isNormalizedDGI?: boolean;
     dgiExemptionReason?: string;
   }): Sale => {
@@ -1070,7 +1072,7 @@ export const AppProvider: React.FC<{ children: React.ReactNode }> = ({ children 
       totalTTC_CDF: totalCDF,
     };
 
-    const cashierName = currentUser?.name || settings.cashierName || 'Responsable Ventes';
+    const cashierName = saleData.cashierName || currentUser?.name || settings.cashierName || 'Responsable Ventes';
 
     const paymentHistory: PaymentEntry[] = [];
     if (paidUSD > 0) {

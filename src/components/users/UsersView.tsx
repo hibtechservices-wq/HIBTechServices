@@ -291,9 +291,21 @@ export const UsersView: React.FC = () => {
                       >
                         {roleInfo.label}
                       </span>
-                      <span className="block text-[10px] text-neutral-400 mt-0.5">
-                        {grantedPermsCount} permission(s) accordée(s)
-                      </span>
+                      <div className="flex items-center gap-1.5 mt-1 flex-wrap">
+                        {user.permissions?.canCreateInvoices || user.role === 'SUPER_ADMIN' || user.role === 'CASHIER' ? (
+                          <span className="inline-flex items-center gap-1 text-[9px] font-bold text-emerald-800 bg-emerald-50 border border-emerald-300 px-1.5 py-0.2 rounded-full">
+                            <CheckCircle2 className="w-2.5 h-2.5 text-emerald-600" />
+                            <span>Autorisé à facturer</span>
+                          </span>
+                        ) : (
+                          <span className="inline-flex items-center gap-1 text-[9px] text-neutral-500 bg-neutral-100 border border-neutral-200 px-1.5 py-0.2 rounded-full">
+                            <span>Facturation bloquée</span>
+                          </span>
+                        )}
+                        <span className="text-[10px] text-neutral-400">
+                          ({grantedPermsCount} droits)
+                        </span>
+                      </div>
                     </td>
 
                     {/* Assigned register */}

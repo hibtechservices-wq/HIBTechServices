@@ -86,7 +86,10 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
   // Opening form state
   const [openFloatUSD, setOpenFloatUSD] = useState<number>(50);
   const [openFloatCDF, setOpenFloatCDF] = useState<number>(100000);
-  const [openCashierName, setOpenCashierName] = useState<string>(currentUser.name || settings.cashierName || 'Caissier Principal');
+  const [openCashierName, setOpenCashierName] = useState<string>(() => {
+    const defaultCashier = users.find(u => u.role === 'CASHIER' && u.isActive);
+    return defaultCashier?.name || currentUser.name || settings.cashierName || 'Rachel Mwamba (Caisse POS)';
+  });
   const [openSupervisorName, setOpenSupervisorName] = useState<string>('Direction Générale');
 
   // Closing & Billetage form state
@@ -1015,29 +1018,75 @@ export const CashRegisterView: React.FC<CashRegisterViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-bold text-neutral-700 mb-1 uppercase tracking-wider text-[10px]">
-                  Caissier Assigné *
+                <label className="block font-bold text-neutral-700 mb-1 uppercase tracking-wider text-[10px] flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <UserCheck className="w-3.5 h-3.5 text-emerald-600" />
+                    <span>Sélectionner le Caissier Assigné & Autorisé *</span>
+                  </span>
+                  <span className="text-[10px] text-neutral-500 font-normal">
+                    {users.length} compte(s) disponible(s)
+                  </span>
                 </label>
-                <input
-                  type="text"
-                  value={openCashierName}
-                  onChange={(e) => setOpenCashierName(e.target.value)}
-                  className="w-full bg-neutral-50 border border-neutral-300 rounded-lg p-2.5 text-neutral-900 font-semibold focus:bg-white"
-                  required
-                />
+                <div className="space-y-2">
+                  <select
+                    value={users.some(u => u.name === openCashierName) ? openCashierName : 'AUTRE'}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      if (val !== 'AUTRE') {
+                        setOpenCashierName(val);
+                      } else {
+                        setOpenCashierName('');
+                      }
+                    }}
+                    className="w-full bg-white border border-neutral-300 rounded-lg p-2.5 text-neutral-900 font-semibold focus:border-neutral-900 text-xs shadow-2xs"
+                    required
+                  >
+                    <option value="" disabled>-- Cliquez pour choisir le caissier dans la liste --</option>
+                    {users.map((u) => (
+                      <option key={u.id} value={u.name}>
+                        {u.name} — [{u.role === 'CASHIER' ? 'Caissier POS' : u.role === 'SUPER_ADMIN' ? 'Gérant' : u.role === 'MANAGER' ? 'Superviseur' : u.role}] {u.assignedRegister ? `(${u.assignedRegister})` : ''} {!u.isActive ? '(Compte Bloqué)' : ''}
+                      </option>
+                    ))}
+                    <option value="AUTRE">+ Saisir manuellement un autre nom...</option>
+                  </select>
+
+                  {/* Saisie manuelle si choix AUTRE ou si le nom n'est pas dans la liste */}
+                  {(!users.some(u => u.name === openCashierName) || openCashierName === '') && (
+                    <input
+                      type="text"
+                      value={openCashierName}
+                      onChange={(e) => setOpenCashierName(e.target.value)}
+                      placeholder="Saisissez le nom et prénom du caissier..."
+                      className="w-full bg-neutral-50 border border-neutral-300 rounded-lg p-2.5 text-neutral-900 font-semibold focus:bg-white text-xs"
+                      required
+                    />
+                  )}
+                </div>
               </div>
 
               <div>
-                <label className="block font-bold text-neutral-700 mb-1 uppercase tracking-wider text-[10px]">
-                  Autorisé par (Superviseur / Direction) *
+                <label className="block font-bold text-neutral-700 mb-1 uppercase tracking-wider text-[10px] flex items-center justify-between">
+                  <span className="flex items-center gap-1">
+                    <ShieldCheck className="w-3.5 h-3.5 text-blue-600" />
+                    <span>Autorisé par (Superviseur / Direction) *</span>
+                  </span>
                 </label>
-                <input
-                  type="text"
+                <select
                   value={openSupervisorName}
                   onChange={(e) => setOpenSupervisorName(e.target.value)}
-                  className="w-full bg-neutral-50 border border-neutral-300 rounded-lg p-2.5 text-neutral-900 font-medium focus:bg-white"
+                  className="w-full bg-white border border-neutral-300 rounded-lg p-2.5 text-neutral-900 font-medium focus:border-neutral-900 text-xs shadow-2xs"
                   required
-                />
+                >
+                  <option value="Direction Générale">Direction Générale</option>
+                  {users
+                    .filter((u) => u.isActive && (u.role === 'SUPER_ADMIN' || u.role === 'MANAGER'))
+                    .map((u) => (
+                      <option key={u.id} value={u.name}>
+                        {u.name} ({u.role === 'SUPER_ADMIN' ? 'Gérant Principal' : 'Superviseur Commercial'})
+                      </option>
+                    ))}
+                  <option value="Superviseur Caisse">Superviseur Caisse</option>
+                </select>
               </div>
 
               <div className="p-3 bg-emerald-50 text-emerald-800 rounded-lg border border-emerald-200 text-[11px] leading-relaxed flex items-start gap-2">

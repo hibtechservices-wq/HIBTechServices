@@ -31,11 +31,9 @@ import {
   Check,
   ChevronRight,
   Radio,
-  Wrench,
-  Smartphone
+  Wrench
 } from 'lucide-react';
 import confetti from 'canvas-confetti';
-import { PWAInstallButton } from '../pwa/PWAInstallButton';
 
 export const ClientPortalView: React.FC = () => {
   const {
@@ -160,8 +158,6 @@ export const ClientPortalView: React.FC = () => {
 
           {/* Quick Portal Header Actions */}
           <div className="flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end gap-3 shrink-0">
-            {/* Install Mobile App (PWA & APK guide) */}
-            <PWAInstallButton variant="portal" />
 
             {/* Return to Admin / POS */}
             <button
@@ -247,27 +243,6 @@ export const ClientPortalView: React.FC = () => {
             <CheckCircle2 className="w-4 h-4 text-emerald-400 shrink-0" />
             <span>Devis Proforma Normalisé DGI</span>
           </div>
-        </div>
-      </div>
-
-      {/* Mobile Android / APK banner on Portal */}
-      <div className="bg-gradient-to-r from-emerald-50 via-teal-50 to-white border border-emerald-200/90 rounded-2xl p-3 sm:p-4 flex flex-col sm:flex-row items-center justify-between gap-3 shadow-2xs">
-        <div className="flex items-center gap-3">
-          <div className="w-10 h-10 rounded-2xl bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Smartphone className="w-5 h-5" />
-          </div>
-          <div>
-            <div className="text-xs sm:text-sm font-bold text-neutral-900 flex items-center gap-2">
-              <span>Installer l'application sur votre smartphone Android / iPhone</span>
-              <span className="px-2 py-0.5 rounded-full text-[9px] font-black uppercase bg-emerald-600 text-white">Sans Play Store</span>
-            </div>
-            <p className="text-[11px] sm:text-xs text-neutral-600">
-              Ajoutez l'application directement sur l'écran d'accueil de votre téléphone en 1 clic. Rapide, fluide et sans téléchargement d'APK risqué.
-            </p>
-          </div>
-        </div>
-        <div className="shrink-0 w-full sm:w-auto">
-          <PWAInstallButton variant="portal" />
         </div>
       </div>
 

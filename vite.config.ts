@@ -1,3 +1,4 @@
+import fs from 'fs';
 import tailwindcss from '@tailwindcss/vite';
 import react from '@vitejs/plugin-react';
 import path from 'path';
@@ -8,6 +9,28 @@ export default defineConfig(() => {
   return {
     base: './',
     plugins: [
+      {
+        name: 'apk-downloader-middleware',
+        configureServer(server) {
+          server.middlewares.use((req, res, next) => {
+            const urlPath = (req.url || '').split('?')[0];
+            if (urlPath === '/congobiz-pos.apk' || urlPath === '/congobiz.apk') {
+              const apkFilePath = path.resolve(process.cwd(), 'public/congobiz-pos.apk');
+              if (fs.existsSync(apkFilePath)) {
+                const stat = fs.statSync(apkFilePath);
+                res.writeHead(200, {
+                  'Content-Type': 'application/vnd.android.package-archive',
+                  'Content-Length': stat.size,
+                  'Content-Disposition': 'attachment; filename="congobiz-pos.apk"',
+                  'Cache-Control': 'public, max-age=3600',
+                });
+                return fs.createReadStream(apkFilePath).pipe(res);
+              }
+            }
+            next();
+          });
+        },
+      },
       react(),
       tailwindcss(),
       VitePWA({

@@ -12,7 +12,6 @@ import {
   QrCode,
   Copy,
   Check,
-  FileCode2,
   Share2,
   Layers
 } from 'lucide-react';
@@ -20,14 +19,14 @@ import { usePWAInstall } from '../../hooks/usePWAInstall';
 import { QRCodeSVG } from 'qrcode.react';
 
 interface PWAInstallButtonProps {
-  variant?: 'header' | 'sidebar' | 'banner' | 'portal';
+  variant?: 'header' | 'sidebar';
 }
 
 export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'header' }) => {
   const { isInstallable, isInstalled, isIOS, isAndroid, install } = usePWAInstall();
   const [showModal, setShowModal] = useState(false);
   const [copied, setCopied] = useState(false);
-  const [activeTab, setActiveTab] = useState<'android' | 'ios' | 'desktop' | 'apk'>(() => {
+  const [activeTab, setActiveTab] = useState<'android' | 'ios' | 'desktop'>(() => {
     if (isIOS) return 'ios';
     return 'android';
   });
@@ -87,65 +86,35 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
       {variant === 'header' && (
         <button
           onClick={handleClick}
-          title="Installer CongoBiz sur votre téléphone, tablette ou ordinateur"
+          title="Télécharger l'APK CongoBiz ou installer sur Android"
           className="flex items-center gap-1.5 px-3 py-1.5 bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-semibold rounded-lg shadow-sm hover:shadow transition-all duration-150 transform active:scale-95 border border-emerald-500/30"
         >
-          <Smartphone className="w-3.5 h-3.5" />
-          <span className="hidden sm:inline">Installer l'App Mobile</span>
-          <span className="sm:hidden">App</span>
+          <Download className="w-3.5 h-3.5" />
+          <span className="hidden sm:inline">Télécharger APK</span>
+          <span className="sm:hidden">APK</span>
           <span className="hidden md:inline-block px-1.5 py-0.2 rounded text-[9px] bg-white/20 uppercase tracking-wider font-mono">
             Android
           </span>
         </button>
       )}
 
-      {/* 2. Portal Variant (Prominent & highlighted for clients) */}
-      {variant === 'portal' && (
-        <button
-          onClick={handleClick}
-          className="px-3.5 py-2 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-500 hover:to-teal-500 text-white text-xs font-bold shadow-md hover:shadow-lg transition-all flex items-center justify-center gap-2 border border-emerald-400/40"
-          title="Installer l'application sur votre smartphone Android ou iPhone"
-        >
-          <Smartphone className="w-4 h-4 text-emerald-200" />
-          <span>Installer l'App Mobile (Android / APK)</span>
-        </button>
-      )}
-
-      {/* 3. Sidebar Variant */}
+      {/* 2. Sidebar Variant */}
       {variant === 'sidebar' && (
         <button
           onClick={handleClick}
           className="w-full flex items-center gap-3 px-3 py-2 text-xs font-semibold rounded-xl text-emerald-700 bg-emerald-50 hover:bg-emerald-100 border border-emerald-200 transition-colors"
         >
           <div className="w-7 h-7 rounded-lg bg-emerald-600 text-white flex items-center justify-center shrink-0 shadow-xs">
-            <Smartphone className="w-4 h-4" />
+            <Download className="w-4 h-4" />
           </div>
           <div className="text-left leading-tight">
-            <div className="font-bold">Installer sur Téléphone</div>
-            <div className="text-[10px] text-emerald-600 font-normal">Android & PWA Hors-ligne</div>
+            <div className="font-bold flex items-center gap-1.5">
+              <span>Télécharger l'APK</span>
+              <span className="px-1.5 py-0.2 rounded text-[9px] bg-emerald-600 text-white font-mono font-bold">.apk</span>
+            </div>
+            <div className="text-[10px] text-emerald-600 font-normal">Application Android 100% Hors-ligne</div>
           </div>
         </button>
-      )}
-
-      {/* 4. Banner Variant */}
-      {variant === 'banner' && (
-        <div className="p-4 bg-gradient-to-r from-emerald-900 to-teal-950 text-white rounded-2xl border border-emerald-800 flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="w-10 h-10 rounded-xl bg-emerald-500/20 text-emerald-400 flex items-center justify-center shrink-0">
-              <Smartphone className="w-5 h-5" />
-            </div>
-            <div>
-              <div className="font-bold text-sm">Installer l'application sur votre smartphone</div>
-              <div className="text-xs text-neutral-300">Accès rapide sur l'écran d'accueil sans passer par le Play Store</div>
-            </div>
-          </div>
-          <button
-            onClick={handleClick}
-            className="w-full sm:w-auto px-4 py-2 bg-emerald-500 hover:bg-emerald-400 text-neutral-950 font-bold rounded-xl text-xs transition shadow-sm"
-          >
-            Guide d'installation Android
-          </button>
-        </div>
       )}
 
       {/* Installation Guide & Troubleshooting Modal */}
@@ -163,19 +132,19 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
               </button>
               <div className="flex items-start sm:items-center gap-3">
                 <div className="w-12 h-12 rounded-2xl bg-emerald-500 text-neutral-950 flex items-center justify-center shadow-lg shrink-0">
-                  <Smartphone className="w-6 h-6" />
+                  <Download className="w-6 h-6" />
                 </div>
                 <div>
                   <div className="flex items-center gap-2">
                     <h3 className="text-lg font-black tracking-tight text-white">
-                      Installer sur Android & Mobile
+                      Télécharger CongoBiz (APK & Mobile)
                     </h3>
-                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-amber-400 text-neutral-950">
-                      PWA & APK
+                    <span className="px-2 py-0.5 rounded-full text-[10px] font-black bg-emerald-400 text-neutral-950">
+                      Fichier .APK
                     </span>
                   </div>
                   <p className="text-xs text-neutral-300 mt-1">
-                    Installation directe en 1 clic sur votre écran d'accueil sans risque de sécurité
+                    Téléchargez directement le fichier APK officiel ou ajoutez l'app en 1 clic
                   </p>
                 </div>
               </div>
@@ -198,7 +167,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
                     <span>Scannez ce QR Code avec votre téléphone</span>
                   </div>
                   <p className="text-[11px] text-neutral-500 leading-snug">
-                    Pointez l'appareil photo de votre smartphone Android sur ce code pour ouvrir l'application directement.
+                    Pointez l'appareil photo de votre smartphone Android ou iPhone pour ouvrir l'application et télécharger l'APK directement.
                   </p>
                   <div className="pt-1 flex flex-wrap items-center justify-center sm:justify-start gap-2">
                     <button
@@ -227,7 +196,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
             </div>
 
             {/* Platform Selector Tabs */}
-            <div className="grid grid-cols-4 border-b border-neutral-200 bg-neutral-100 p-1.5 gap-1 text-xs font-semibold text-neutral-600">
+            <div className="grid grid-cols-3 border-b border-neutral-200 bg-neutral-100 p-1.5 gap-1 text-xs font-semibold text-neutral-600">
               <button
                 onClick={() => setActiveTab('android')}
                 className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl transition-all ${
@@ -237,19 +206,7 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
                 }`}
               >
                 <Smartphone className="w-3.5 h-3.5 text-emerald-600 shrink-0" />
-                <span className="truncate">Android</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('apk')}
-                className={`flex items-center justify-center gap-1.5 py-2 px-2 rounded-xl transition-all ${
-                  activeTab === 'apk'
-                    ? 'bg-white text-amber-700 shadow-xs border border-neutral-200 font-bold'
-                    : 'hover:bg-neutral-200 text-neutral-600'
-                }`}
-              >
-                <FileCode2 className="w-3.5 h-3.5 text-amber-600 shrink-0" />
-                <span className="truncate">Fichier APK</span>
+                <span className="truncate">Android (APK)</span>
               </button>
 
               <button
@@ -279,30 +236,49 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
 
             {/* Tab Contents */}
             <div className="p-5 sm:p-6 space-y-4 max-h-[55vh] overflow-y-auto">
-              {/* TAB 1: ANDROID PWA (RECOMMENDED) */}
+              {/* TAB 1: ANDROID APK DIRECT DOWNLOAD */}
               {activeTab === 'android' && (
                 <div className="space-y-4">
-                  {/* Explanation of why PWA is better than manual APK */}
-                  <div className="p-3.5 bg-emerald-50 rounded-2xl border border-emerald-200/80 flex items-start gap-3">
-                    <Sparkles className="w-5 h-5 text-emerald-600 shrink-0 mt-0.5" />
-                    <div className="text-xs text-emerald-950 space-y-1">
-                      <div className="font-bold">Pourquoi pas besoin de télécharger un fichier APK ?</div>
-                      <p className="text-emerald-800 leading-relaxed">
-                        Cette application est une <strong>Progressive Web App (PWA) certifiée</strong>. Sur Android, Google Chrome installe l'application directement sur votre écran d'accueil avec son icône et son fonctionnement hors-ligne, <strong>sans aucun avertissement de sécurité « fichier potentiellement dangereux »</strong>.
-                      </p>
+                  {/* DIRECT APK DOWNLOAD BUTTON */}
+                  <a
+                    href="/congobiz-pos.apk"
+                    download="congobiz-pos.apk"
+                    className="w-full p-4 bg-gradient-to-r from-emerald-600 via-teal-600 to-emerald-700 hover:from-emerald-500 hover:to-teal-600 text-white rounded-2xl shadow-md hover:shadow-xl transition-all flex items-center justify-between gap-3 group border border-emerald-400/30"
+                  >
+                    <div className="flex items-center gap-3">
+                      <div className="w-11 h-11 rounded-xl bg-white/20 flex items-center justify-center shrink-0 group-hover:scale-110 transition-transform">
+                        <Download className="w-6 h-6 text-white" />
+                      </div>
+                      <div className="text-left">
+                        <div className="font-black text-sm sm:text-base leading-tight flex items-center gap-2">
+                          <span>Télécharger l'APK CongoBiz</span>
+                          <span className="px-1.5 py-0.5 rounded text-[10px] bg-amber-400 text-neutral-950 font-bold">
+                            Direct
+                          </span>
+                        </div>
+                        <div className="text-xs text-emerald-100 mt-0.5">
+                          Fichier d'installation natif Android (.apk)
+                        </div>
+                      </div>
                     </div>
-                  </div>
+                    <div className="text-right shrink-0">
+                      <div className="px-2.5 py-1 rounded-lg text-xs font-mono font-bold bg-white/20">
+                        26 Ko
+                      </div>
+                      <div className="text-[10px] text-emerald-200 mt-0.5">v1.0.0</div>
+                    </div>
+                  </a>
 
-                  {/* 3 Steps to install on Android */}
+                  {/* 3 Steps to install the downloaded APK */}
                   <div className="space-y-2.5 text-xs text-neutral-800 font-medium">
                     <div className="flex items-start gap-3 p-3 bg-neutral-50 rounded-2xl border border-neutral-200">
                       <span className="w-6 h-6 rounded-xl bg-emerald-600 text-white font-extrabold flex items-center justify-center shrink-0 text-xs shadow-xs">
                         1
                       </span>
                       <div>
-                        <div className="font-bold text-neutral-900">Ouvrez le lien dans Google Chrome</div>
+                        <div className="font-bold text-neutral-900">Téléchargez le fichier</div>
                         <p className="text-neutral-600 text-[11px] mt-0.5">
-                          Sur votre téléphone Android, ouvrez l'application via le navigateur <strong>Google Chrome</strong> (scannez le QR code ci-dessus ou collez le lien copié).
+                          Touchez le bouton vert ci-dessus. Le fichier <strong>congobiz-pos.apk</strong> se télécharge directement sur votre téléphone en 1 seconde.
                         </p>
                       </div>
                     </div>
@@ -312,9 +288,9 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
                         2
                       </span>
                       <div>
-                        <div className="font-bold text-neutral-900">Appuyez sur les 3 points ⋮</div>
+                        <div className="font-bold text-neutral-900">Ouvrez le fichier téléchargé</div>
                         <p className="text-neutral-600 text-[11px] mt-0.5">
-                          Dans le coin supérieur droit de Google Chrome, appuyez sur le bouton de menu <strong>⋮ (trois points verticaux)</strong>.
+                          Touchez la notification de fin de téléchargement ou ouvrez votre application <strong>Téléchargements / Fichiers</strong>.
                         </p>
                       </div>
                     </div>
@@ -324,77 +300,20 @@ export const PWAInstallButton: React.FC<PWAInstallButtonProps> = ({ variant = 'h
                         3
                       </span>
                       <div>
-                        <div className="font-bold text-neutral-900">Appuyez sur « Installer l'application »</div>
+                        <div className="font-bold text-neutral-900">Autorisez et Installez</div>
                         <p className="text-neutral-600 text-[11px] mt-0.5">
-                          Sélectionnez <strong>« Installer l'application »</strong> (ou <strong>« Ajouter à l'écran d'accueil »</strong>). L'icône de l'application s'ajoute immédiatement à votre écran d'accueil comme n'importe quel APK !
-                        </p>
-                      </div>
-                    </div>
-                  </div>
-                </div>
-              )}
-
-              {/* TAB 2: PHYSICAL APK FILE GENERATION */}
-              {activeTab === 'apk' && (
-                <div className="space-y-4">
-                  <div className="p-3.5 bg-amber-50 rounded-2xl border border-amber-200 flex items-start gap-3">
-                    <FileCode2 className="w-5 h-5 text-amber-700 shrink-0 mt-0.5" />
-                    <div className="text-xs text-amber-950 space-y-1">
-                      <div className="font-bold">Générer un fichier APK physique (.apk)</div>
-                      <p className="text-amber-900 leading-relaxed">
-                        Si vous avez impérativement besoin d'un fichier <code>.apk</code> à partager par clé USB ou WhatsApp pour des appareils sans accès internet initial, vous pouvez empaqueter la PWA en APK natif en 2 minutes via <strong>PWABuilder</strong> (outil gratuit officiel recommandé par Google et Microsoft).
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="space-y-2.5 text-xs text-neutral-700">
-                    <div className="flex items-start gap-3 p-3 bg-neutral-50 rounded-2xl border border-neutral-200">
-                      <span className="w-6 h-6 rounded-xl bg-amber-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
-                        1
-                      </span>
-                      <div>
-                        <div className="font-bold text-neutral-900">Copiez le lien public de l'application</div>
-                        <p className="text-neutral-600 text-[11px] mt-0.5 font-mono break-all">
-                          {publicUrl}
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3 p-3 bg-neutral-50 rounded-2xl border border-neutral-200">
-                      <span className="w-6 h-6 rounded-xl bg-amber-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
-                        2
-                      </span>
-                      <div>
-                        <div className="font-bold text-neutral-900">Allez sur le générateur officiel PWABuilder</div>
-                        <p className="text-neutral-600 text-[11px] mt-0.5">
-                          Collez l'URL de votre application sur <strong>PWABuilder.com</strong>, puis cliquez sur <strong>« Package for Stores & Android APK »</strong>.
-                        </p>
-                      </div>
-                    </div>
-
-                    <div className="flex items-start gap-3 p-3 bg-neutral-50 rounded-2xl border border-neutral-200">
-                      <span className="w-6 h-6 rounded-xl bg-amber-600 text-white font-bold flex items-center justify-center shrink-0 text-xs">
-                        3
-                      </span>
-                      <div>
-                        <div className="font-bold text-neutral-900">Téléchargez le fichier .apk signé</div>
-                        <p className="text-neutral-600 text-[11px] mt-0.5">
-                          Vous recevrez directement votre fichier <code>.apk</code> prêt à installer sur tous vos appareils Android.
+                          Si Android demande d'autoriser l'installation des applications inconnues pour votre navigateur ou gestionnaire de fichiers, activez <strong>« Autoriser cette source »</strong> puis appuyez sur <strong>« Installer »</strong>. L'icône CongoBiz s'ajoute à vos applications !
                         </p>
                       </div>
                     </div>
                   </div>
 
-                  <div className="pt-2">
-                    <a
-                      href={`https://www.pwabuilder.com?url=${encodeURIComponent(publicUrl)}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="w-full py-2.5 px-4 bg-amber-500 hover:bg-amber-400 text-neutral-950 font-bold rounded-xl text-xs transition flex items-center justify-center gap-2 shadow-sm"
-                    >
-                      <ExternalLink className="w-4 h-4" />
-                      <span>Ouvrir PWABuilder pour générer le fichier .apk</span>
-                    </a>
+                  {/* Alternative direct 1-tap browser install without file */}
+                  <div className="p-3 bg-emerald-50 rounded-2xl border border-emerald-200/80 flex items-start gap-2.5">
+                    <Sparkles className="w-4 h-4 text-emerald-600 shrink-0 mt-0.5" />
+                    <div className="text-[11px] text-emerald-950 leading-relaxed">
+                      <strong>Astuce :</strong> Vous pouvez également ajouter l'application directement depuis Google Chrome sans télécharger de fichier via le menu <strong>⋮ (trois points)</strong> &gt; <strong>« Installer l'application »</strong>.
+                    </div>
                   </div>
                 </div>
               )}

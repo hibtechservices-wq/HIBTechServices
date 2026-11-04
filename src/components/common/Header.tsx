@@ -144,6 +144,9 @@ export const Header: React.FC = () => {
             <span className="text-[10px] text-slate-500 font-medium">CDF</span>
           </button>
 
+          {/* Direct APK Download / Mobile App Button */}
+          <PWAInstallButton variant="header" />
+
           {/* Currency Display Switcher */}
           <div className="h-8 sm:h-9 inline-flex items-center bg-slate-100 p-0.5 rounded-lg border border-slate-200 text-xs shrink-0">
             <button
